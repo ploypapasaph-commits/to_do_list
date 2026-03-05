@@ -32,7 +32,7 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 - Work Queue: grouped action buckets (Calls/Visits/Admin/External), priority sub-groups, one-by-one primary processing mode, rapid-fire extended mode
 - Performance & Visibility Dashboard: supervisor team workload + exception alerts; staff self-service metrics + gamified leaderboard
 - Contact compliance **enforcement**: queries BOS collection note log at task generation time (if daily limit reached → task suppressed); subscribes to ContactWindowClosed event for business hours enforcement
-- Action verification: 3CX call log cross-check, verification status (Verified/Unverified/Mismatch)
+- Action verification: cross-reference recorded Call outcomes against BOS collection note log (trust-but-verify; does not block CO workflow)
 - Template Library: HQ-owned action type definitions, typed outcomes, required fields, SLA defaults, escalation rules
 - Action Guide: per-contract timing signals and action approach guidance surfaced on the Customer Page (when to act, how to act, talking points, required outcome reminders)
 - AM Worklist: area manager operational queue for escalated and manually-added contracts; AM assign / legal action / find new address actions
@@ -173,7 +173,7 @@ graph LR
 | Contact Compliance Rate | % of days with zero contact limit violations per branch | 100% |
 | SLA Breach Rate | % of tasks that expire OVERDUE without supervisor intervention within 4 hours | < 5% |
 | Playbook Completion Rate | % of initiated playbooks that reach End (Success) vs. End (Failed) | Track per playbook type |
-| Action Verification Rate | % of Call tasks with Verified status from 3CX cross-check | > 95% |
+| Action Verification Rate | % of Call tasks with Verified status from BOS collection note log cross-check | > 95% |
 
 ---
 
