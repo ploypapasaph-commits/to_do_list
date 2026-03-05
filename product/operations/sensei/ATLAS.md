@@ -78,25 +78,43 @@ Higher urgency = more aggressive timing, lower retry tolerance, earlier escalati
 Collection for a contract follows a sequential chain of four Objectives. Each Objective is a self-contained playbook stage. The chain terminates only when an End Condition is met.
 
 ```
-┌──────────────────────┐
-│  เอาวันนัดชำระ        │  ← P2 events (สัญญาใกล้ due / ไม่มีนัดชำระ)
-└──────────┬───────────┘
-           │ ได้วันนัดชำระ
-┌──────────▼───────────┐
-│  แจ้งเตือนยืนยัน      │  ← 1 day before appointment
-│  นัดชำระ             │
-└──────────┬───────────┘
-           │ สัญญาว่าจะชำระ
-┌──────────▼───────────┐
-│  เก็บยอดตาม           │  ← On appointment date
-│  นัดชำระ             │
-└──────────┬───────────┘
-           │ ไม่ชำระ / ปฏิเสธ
-┌──────────▼───────────┐
-│  ติดตามเข้มงวด        │  ← When contract enters strict follow-up list
-└──────────┬───────────┘
-           ▼
-    END CONDITIONS
+                         risk (contract enters)
+                               │
+          ┌────────────────────▼─────────────────────┐
+          │         เอาวันนัดชำระ                     │
+          │         DL: d  │  attempts: 3             │
+          └──┬──────────┬──────────┬──────────────────┘
+             │          │          │          │
+          success   do not      hard       no action
+             │       success    reject          │
+             │          │          │            ▼
+             │          └────┬─────┘    🔒 ส่งเรื่องให้ผู้จัดการพื้นที่
+             │               ▼            (AM assign / legal action /
+             │    ┌──────────────────────┐  find new address)
+             │    │   ติดตามเข้มงวด      │◀──────────────────────────┐
+             │    │   DL: d+3 | att: 1   │                           │
+             │    │   DL: PTP+1 | att: 1 │                           │
+             │    └──────┬──────────┬────┘                           │
+             │           │          │    │                            │
+             │        get PTP   paid full  no                        │
+             │           │          │    └──── re-queue ─────────────┘
+             │           └──┐       ▼
+             │              │     END ✅
+             ▼              │
+  ┌──────────────────────┐  │
+  │  แจ้งเตือนยืนยัน     │  │ (loop: get PTP in strict mode
+  │  นัดชำระ             │  │  re-enters at PTP+1)
+  │  DL: PTP-1 | att: 3  │  │
+  └──────────┬───────────┘  │
+             │ สัญญาว่าจะชำระ │
+  ┌──────────▼──────────────▼┐
+  │  เก็บยอดตามนัดชำระ       │  ← paid full? check
+  │  DL: PTP  │  att: 3      │
+  └──────────┬───────────────┘
+             │
+         paid full
+             ▼
+           END ✅
 ```
 
 ---
@@ -105,46 +123,54 @@ Collection for a contract follows a sequential chain of four Objectives. Each Ob
 
 **Ownership split**: HQ defines Objective names, sequence, and default parameter values. Supervisor (AM and above) can adjust `วันที่สร้างงาน`, `อายุของงาน`, and `Action ที่แนะนำ` within HQ-set limits per urgency tier.
 
-| Objective | วันที่สร้างงาน (default) | อายุของงาน (default) | Action ที่แนะนำ (default) | จำนวนทำซ้ำ |
-|-----------|------------------------|---------------------|--------------------------|------------|
-| เอาวันนัดชำระ | ก่อน due 7 วัน | 7 วัน | 📞 โทร | 3 ครั้ง |
-| แจ้งเตือนยืนยันนัดชำระ | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| เก็บยอดตามนัดชำระ | วันนัดชำระ | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| ติดตามเข้มงวด | วันที่ list ขึ้น | 3 วัน | 🏠 ลงพื้นที่ | 1 ครั้ง |
+| Objective | DL (Deadline) | วันที่สร้างงาน (default) | อายุของงาน (default) | Action ที่แนะนำ (default) | จำนวนทำซ้ำ |
+|-----------|--------------|------------------------|---------------------|--------------------------|------------|
+| เอาวันนัดชำระ | d (due date) | ก่อน due 7 วัน | 7 วัน | 📞 โทร | 3 ครั้ง |
+| แจ้งเตือนยืนยันนัดชำระ | PTP − 1 วัน | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 📞 โทร | 3 ครั้ง |
+| เก็บยอดตามนัดชำระ | PTP (วันนัดชำระ) | วันนัดชำระ | ภายในวัน | 📞 โทร | 3 ครั้ง |
+| ติดตามเข้มงวด — รอบแรก | d + 3 | วันที่ list ขึ้น | 3 วัน | 🏠 ลงพื้นที่ | 1 ครั้ง |
+| ติดตามเข้มงวด — หลังได้ PTP | PTP + 1 | วันถัดจากวันนัดใหม่ | ภายในวัน | 📞 โทร | 1 ครั้ง |
 
 ---
 
 ### Outcome Routing per Objective
 
 #### เอาวันนัดชำระ
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ได้วันนัดชำระ | → แจ้งเตือนยืนยันนัดชำระ |
-| ไม่ได้วันนัดชำระ | → ติดตามเข้มงวด |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
-| ไม่ได้ทำ (หมดอายุ) | → 🔒 ส่งเรื่องให้ผู้จัดการพื้นที่ — **no new task created**; contract moves into AM's responsible list (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่) |
+*(DL: d — due date | attempts: 3)*
+
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ได้วันนัดชำระ | success | → แจ้งเตือนยืนยันนัดชำระ (DL: PTP−1) |
+| ไม่ได้วันนัดชำระ | do not success | → ติดตามเข้มงวด (DL: d+3) |
+| ปฏิเสธการชำระ | hard reject | → ติดตามเข้มงวด (DL: d+3) |
+| ไม่ได้ทำ (หมดอายุ) | no action | → 🔒 ส่งเรื่องให้ผู้จัดการพื้นที่ — **no new task created**; contract moves into AM's responsible list (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่) |
 
 #### แจ้งเตือนยืนยันนัดชำระ
+*(DL: PTP−1 | attempts: 3)*
+
 | ผลลัพธ์ | ขั้นตอนถัดไป |
 |--------|-------------|
-| สัญญาว่าจะชำระ | → เก็บยอดตามนัดชำระ |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
+| สัญญาว่าจะชำระ | → เก็บยอดตามนัดชำระ (DL: PTP) |
+| ปฏิเสธการชำระ | → ติดตามเข้มงวด (DL: d+3) |
 | นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ (re-trigger on new date) |
-| ติดต่อไม่ได้ | → ติดตามเข้มงวด |
+| ติดต่อไม่ได้ | → ติดตามเข้มงวด (DL: d+3) |
 
 #### เก็บยอดตามนัดชำระ
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ชำระตามยอดคาดการณ์ | → สิ้นสุดการตาม ✅ |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
-| นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ |
+*(DL: PTP — payment date | attempts: 3 — "paid full?" check)*
+
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ชำระตามยอดคาดการณ์ | paid full | → สิ้นสุดการตาม ✅ |
+| ไม่ชำระ / ชำระไม่ครบ | do not get payment / not full | → ติดตามเข้มงวด (DL: d+3) |
 
 #### ติดตามเข้มงวด
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ชำระตามยอดคาดการณ์ | → สิ้นสุดการตาม ✅ |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด (re-queue) |
-| นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ |
+*(รอบแรก DL: d+3 | attempts: 1 → หลังได้ PTP ใหม่ DL: PTP+1 | attempts: 1)*
+
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ได้นัดชำระใหม่ | get PTP | → เก็บยอดตามนัดชำระ (re-enter at DL: PTP+1) |
+| ชำระตามยอดคาดการณ์ | paid full | → สิ้นสุดการตาม ✅ |
+| ไม่ได้ผล | no | → ติดตามเข้มงวด (re-queue, loop) |
 
 ---
 
@@ -416,7 +442,7 @@ Accelerated mode for experienced COs on high-volume buckets:
 | **Summary Widget** | งานที่ต้องจัดการ — active task count | งานที่พื้นที่ต้องจัดการ — AM contract count |
 | **Work Setting** | การเรียงลำดับงาน / Strategy | การเรียงลำดับงาน / Strategy |
 | **Tracking Table** | Team workload per CO | Branch performance per branch (daily + weekly) |
-| **Collection List** | Work Queue (priority-based) | AM's responsible contracts + branch collection list |
+| **Collection List** | Work Queue (priority-based) | → AM Worklist (Section 6): สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ + การติดตามหนี้ในแต่ละสาขา |
 | **Performance Summary** | Daily/weekly/monthly scorecard + leaderboard | Area targets + DPD movement |
 
 ---
@@ -458,10 +484,134 @@ Accelerated mode for experienced COs on high-volume buckets:
 | **ภาพรวมการทำงานเดือนนี้** | Monthly cumulative vs. target |
 | **การไหลของ DPD** | DPD movement (C to X, X to 30) — current and prior month |
 
-#### B2. สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (AM's Responsible Contracts)
+#### B2 & B3: AM Contract Lists
 
-Entry routes: (1) auto-escalated via "ส่งเรื่องให้ผู้จัดการพื้นที่" — **no new task created**; (2) manually added by AM from branch collection list.
-AM actions: assign to original branch / reassign to another branch / handle directly.
+Moved to **AM Worklist** capability — see [Section 6](#6-core-capability-am-worklist).
+
+---
+
+## 5. Core Capability: Action Guide
+
+**Goal**: Surface per-contract action intelligence directly on the Customer Page — telling COs **when to act** (timing signals) and **how to act** (approach guidance based on contract type, portfolio, urgency tier, and current objective stage).
+
+### Why It Exists (First Principles)
+
+- **300–500 contracts per day**: COs cannot recall the right approach for every contract. Embedded guidance removes cognitive load and reduces errors.
+- **Contract type matters**: A risk_level 6 active portfolio contract needs a different approach than an easiness_to_collect 7 write-off contract.
+- **Objective stage context**: The same outcome means different things at เอาวันนัดชำระ vs. ติดตามเข้มงวด — guidance must reflect the CO's position in the chain.
+- **Consistency**: Embedded guidance enforces uniform playbook execution across all COs and branches.
+
+### Where It Appears
+
+| Location | Content |
+|----------|---------|
+| Customer Page — Action Guide panel | Full Timing Signal Panel + Action Approach Guide + Talking Points + Required Outcome Reminder |
+| Rapid-Fire Mode — side panel | Condensed timing signal + talking points + required outcome fields |
+| Work Queue table | Key signals already visible as columns: Priority, Urgency, Action, Objective |
+
+### Timing Signal Panel
+
+Rendered at the top of the Action Guide panel. Derived in real-time from task and contract data.
+
+| Signal | Source | Display |
+|--------|--------|---------|
+| Priority Tier | Event classification | P1 / P2 / P3 / P4 badge (color-coded) |
+| Deadline Countdown | DL from current objective | "X วันถึง Deadline" — red if ≤ 1 day |
+| Urgency Score | `the_collection_urgency` | Score + tier label (e.g., "เร่งด่วนสูง") |
+| Days Since Last Contact | Last completed contact task | "ติดต่อล่าสุด X วันที่แล้ว" — flagged if gap > threshold |
+| Objective Stage | Current position in chain | Step indicator: เอาวันนัดชำระ → แจ้งเตือน → เก็บยอด → ติดตามเข้มงวด |
+| Attempts Remaining | จำนวนทำซ้ำ remaining | "เหลือ X ครั้ง" — shown when attempts are limited |
+
+### Action Approach Guide
+
+Recommended approach varies by **portfolio type × current objective × urgency tier**:
+
+#### Active Portfolio (risk_level 1–6)
+
+| Objective | risk_level | Recommended Approach |
+|-----------|-----------|----------------------|
+| เอาวันนัดชำระ | 1–3 | โทรแจ้งกำหนดชำระ, ขอยืนยันวันนัด — tone: friendly reminder |
+| เอาวันนัดชำระ | 4–6 | โทรเน้นความสำคัญ, escalate to visit if no answer after 2 attempts |
+| เก็บยอดตามนัดชำระ | 1–3 | โทรตรวจสอบการชำระ, ยืนยันยอด |
+| เก็บยอดตามนัดชำระ | 4–6 | โทรพร้อมแจ้งผลกระทบ, เสนอ restructure ถ้าจำเป็น |
+| ติดตามเข้มงวด | 1–3 | โทร + เตรียม visit หากไม่ได้ผล |
+| ติดตามเข้มงวด | 4–6 | ลงพื้นที่เป็นหลัก, ประสาน AM ถ้าไม่ได้ผล |
+
+#### Write-Off Portfolio (easiness_to_collect 1–7)
+
+| Objective | easiness_to_collect | Recommended Approach |
+|-----------|--------------------|-----------------------|
+| เอาวันนัดชำระ | 5–7 (ง่าย) | โทรเสนอข้อตกลงการชำระ — tone: cooperative |
+| เอาวันนัดชำระ | 1–4 (ยาก) | ลงพื้นที่ + ประสาน AM สำหรับ legal action หรือ find new address |
+| ติดตามเข้มงวด | 5–7 | โทรยืนยันข้อตกลง, เร่งปิด |
+| ติดตามเข้มงวด | 1–4 | เตรียม legal action route, ส่ง AM |
+
+### Contract Type Context Card
+
+Collapsible card on the Customer Page alongside the Action Guide panel.
+
+| Field | Description |
+|-------|-------------|
+| Portfolio Type | Active / Write-Off badge |
+| Risk / Urgency Tier | Score + label (e.g., risk_level 5 — เสี่ยงสูง) |
+| Payment Behavior | Pattern: paid on time / consistently late / never paid (from history) |
+| Last 3 Contact Results | Most recent 3 outcomes with date |
+| PTP Success Rate | % of past PTPs that resulted in actual payment |
+| DPD Current | Current days-past-due |
+
+### Talking Points Engine
+
+Talking points defined per **objective + portfolio_type** in the Playbook Template by HQ. AM+ can adjust per branch variant.
+
+| Objective | Default Talking Points (configurable) |
+|-----------|--------------------------------------|
+| เอาวันนัดชำระ | "คุณ [ชื่อ] สัญญาของท่านจะครบกำหนดชำระวันที่ [วันที่] ท่านสะดวกนัดวันชำระได้หรือไม่?" |
+| แจ้งเตือนยืนยันนัดชำระ | "ขอยืนยันว่าพรุ่งนี้คือวันนัดชำระของท่าน ท่านยืนยันจะชำระตามนัดไหมครับ/ค่ะ?" |
+| เก็บยอดตามนัดชำระ | "วันนี้คือวันที่ท่านนัดชำระไว้ ขอทราบว่าท่านชำระเรียบร้อยแล้วหรือยัง?" |
+| ติดตามเข้มงวด | "บัญชีของท่านขณะนี้มีสถานะเกินกำหนดชำระ ขอนัดวันชำระโดยเร็วที่สุดได้หรือไม่?" |
+
+### Required Outcome Reminder
+
+Fields the CO must complete before saving — sourced from Template Library definitions.
+
+| Objective + Outcome | Required Fields |
+|--------------------|----------------|
+| เอาวันนัดชำระ — ได้วันนัดชำระ | วันนัดชำระ (date), ยอดคาดการณ์ (amount) |
+| เก็บยอดตามนัดชำระ — ชำระตามยอดคาดการณ์ | ยอดที่ชำระ, วันที่ชำระจริง |
+| ติดตามเข้มงวด — ได้นัดชำระใหม่ | วันนัดชำระใหม่, ยอดคาดการณ์ใหม่ |
+| Any — ปฏิเสธการชำระ | เหตุผลที่ปฏิเสธ (required), follow-up note (optional) |
+
+---
+
+## 6. Core Capability: AM Worklist
+
+**Goal**: Provide the Area Manager (AM) with an operational contract list for managing escalated and manually-added contracts — separate from the performance monitoring dashboard.
+
+### Why It Exists (First Principles)
+
+- **Escalation End-Point**: When collection exhausts branch-level attempts (ไม่ได้ทำ หมดอายุ on เอาวันนัดชำระ), the contract needs AM-level action. Without a dedicated list, escalated contracts have no clear ownership.
+- **AM Agency**: AMs can proactively pull any high-risk contract from any branch into their direct oversight — not only wait for auto-escalation.
+- **Action-Oriented**: AM's Responsible Contracts is an execution queue, not a monitoring report. Each contract surfaces AM-only actions.
+- **Separation of Concerns**: Monitoring belongs in Performance Dashboard. Execution belongs in AM Worklist.
+
+### Entry Routes
+
+| Route | Trigger |
+|-------|---------|
+| **Auto-escalated** | "ส่งเรื่องให้ผู้จัดการพื้นที่" outcome on เอาวันนัดชำระ expiry — **no new task created** |
+| **Manually added** | AM pulls any contract from การติดตามหนี้ในแต่ละสาขา at any time |
+
+### AM Actions per Contract
+
+| Action | Thai Name | Description |
+|--------|-----------|-------------|
+| AM assign | มอบหมายงาน | Assign back to original branch, reassign to another branch, or handle directly |
+| Legal action | ดำเนินคดี | Escalate contract to legal proceedings |
+| Find new address | หาที่อยู่ใหม่ | Initiate address search for uncontactable customer |
+
+### B2. สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (AM's Responsible Contracts)
+
+AM's active action queue — contracts with no pending branch task; AM owns the next decision.
 
 | Column | Description |
 |--------|-------------|
@@ -472,16 +622,18 @@ AM actions: assign to original branch / reassign to another branch / handle dire
 | วันที่ติดต่อล่าสุด | Date of most recent contact |
 | ผลการติดต่อล่าสุด | Outcome of most recent contact |
 | สาขาต้นทาง | Source branch |
-| มอบหมายให้สาขา | Dropdown: assign to branch or keep with AM |
+| มอบหมายให้สาขา | Dropdown: assign to branch (or keep with AM) |
 | หมายเหตุ | Free-text note |
 
-#### B3. การติดตามหนี้ในแต่ละสาขา (Branch Collection List — AM View)
+### B3. การติดตามหนี้ในแต่ละสาขา (Branch Collection Browse)
 
-Full contract list per branch; AM can pull any contract into AM's responsible list; clicking a row opens the customer page.
+Full contract list per branch. AM reads, filters, and can pull any contract into their responsible list. Clicking a row opens the customer page.
+
+**Filters**: Search by ชื่อ-นามสกุล / เลขที่สัญญา / เบอร์โทร / เลขโปรเจคติด / เลขบัตรประชาชน; filter by เลขแมนเอดิต, ถ่วตัวรอง.
 
 | Column | Description |
 |--------|-------------|
-| ความเสี่ยง | Risk level (color-coded badge) |
+| ความเสี่ยง | Risk level (color-coded) |
 | ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
 | % ต่อพอร์ต | Contract weight as % of branch portfolio |
 | Due date | Relevant due date |
@@ -508,7 +660,7 @@ Full contract list per branch; AM can pull any contract into AM's responsible li
 | D5 | **Task Engine is event-driven, not batch-scheduled** | Branch operations are real-time — delinquency changes, payments, and renewals happen continuously. | Tasks are created from events (via DaVinci), not nightly batch jobs. Higher infrastructure complexity but enables same-day response. |
 | D6 | **One-by-one as primary, rapid-fire as extended** | COs handle 300-500 customers/day but complex cases need full context. | One-by-one processing is the default. Rapid-fire is an optional accelerated mode for experienced COs. Prevents mistakes from rushing while enabling throughput for skilled users. |
 | D7 | **Gamified leaderboard** | Staff motivation in high-volume roles benefits from visible competition. | Leaderboard with medals drives engagement. Risk: may create unhealthy competition — mitigated by combining rank with supervisor feedback and collaborative metrics. |
-| D8 | **DaVinci owns compliance data, consumers interpret** | Contact compliance must be enforceable by any system (Sensei, SMS campaigns, call centers), not just one. | DaVinci tracks all contacts centrally and emits events (`ContactLimitReached`, etc.). Each consumer (Sensei, future systems) subscribes and applies its own domain rules. No system depends on Sensei for compliance. Sensei feeds contact outcomes back to DaVinci to keep the central count accurate. |
+| D8 | **BOS log-fact check at task generation, not event subscription** | Contact limit enforcement must happen at task creation time — not reactively after an event arrives. DaVinci owns the cross-product contact count; BOS owns the collection note log used for real-time frequency checks. | Sensei queries the BOS collection note log before generating each contact task. If the customer's daily contact count ≥ limit, the task is not created. No dependency on ContactLimitReached or ContactLimitApproaching events. DaVinci still receives ContactRecorded events from Sensei to maintain the centralized cross-product count. BOS collection note log existence and API contract is TBD — critical open dependency. |
 | D9 | **Trust-but-verify via 3CX cross-check** | COs could fabricate outcomes (record "called" without calling). Direct blocking would slow down legitimate work. | Sensei cross-references 3CX call logs after the fact. Flags discrepancies in supervisor exception panel. Does not block COs in real-time — maintains throughput while enabling accountability. |
 | D10 | **Centralized worklist, not workflow orchestrator** | Domain-specific workflows (loan underwriting, doc verification) have their own complex state machines. Forcing them through Sensei creates a god-service with too many concerns. | Sensei owns task tracking + branch UX, not upstream workflow logic. External services push tasks via `TaskCreationRequest` events. Sensei records outcomes and publishes `TaskCompleted` events. Upstream systems advance their own workflows. Low coupling, domain integrity preserved. |
 | D11 | **Product name: Sensei** | The system guides and structures branch operations — it teaches the organization how to work effectively. | Clear metaphor. Aligns with Japanese-themed naming convention (先生). |

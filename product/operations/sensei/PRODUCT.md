@@ -31,9 +31,11 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 - Task Engine: unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED), event-driven task generation from DaVinci/Core Banking/Policy Admin, external task creation contract (TaskCreationRequest), task completion feedback (TaskCompleted)
 - Work Queue: grouped action buckets (Calls/Visits/Admin/External), priority sub-groups, one-by-one primary processing mode, rapid-fire extended mode
 - Performance & Visibility Dashboard: supervisor team workload + exception alerts; staff self-service metrics + gamified leaderboard
-- Contact compliance **signal consumption** (subscribes to DaVinci events: ContactLimitReached, ContactLimitApproaching, ContactWindowClosed)
+- Contact compliance **enforcement**: queries BOS collection note log at task generation time (if daily limit reached → task suppressed); subscribes to ContactWindowClosed event for business hours enforcement
 - Action verification: 3CX call log cross-check, verification status (Verified/Unverified/Mismatch)
 - Template Library: HQ-owned action type definitions, typed outcomes, required fields, SLA defaults, escalation rules
+- Action Guide: per-contract timing signals and action approach guidance surfaced on the Customer Page (when to act, how to act, talking points, required outcome reminders)
+- AM Worklist: area manager operational queue for escalated and manually-added contracts; AM assign / legal action / find new address actions
 
 **This product IS NOT responsible for:**
 - Contact compliance **data ownership** — contact log, frequency limits, cross-product aggregation (owned by **DaVinci**)
@@ -66,8 +68,58 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 | [Task Engine](capabilities/task-engine/CAPABILITY.md) | Engineering | Draft | Unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED + OVERDUE + ESCALATED). 4 task sources: playbook_step, event_rule, manual, external. External task creation contract (TaskCreationRequest). TaskCompleted feedback events. |
 | [Work Queue](capabilities/work-queue/CAPABILITY.md) | Engineering | Draft | Grouped action buckets (Calls/Visits/Admin). Priority sub-groups (Overdue > High DPD > Normal). One-by-one primary mode. Rapid-fire extended mode. Daily contact limit enforcement. |
 | [Performance Dashboard](capabilities/performance-dashboard/CAPABILITY.md) | Product | Draft | Supervisor view: team workload table, active playbooks, exception panel (5 alert types), daily scorecard, contact compliance status. Staff view: personal metrics, monthly objectives, branch rank, gamified leaderboard, supervisor feedback. |
-| [Contact Compliance](capabilities/contact-compliance/CAPABILITY.md) | Engineering | Draft | Subscribes to DaVinci compliance events. Auto-skips tasks when ContactLimitReached. Shows warning badge when ContactLimitApproaching. Blocks contact tasks outside ContactWindowClosed. Does NOT own contact log data. |
+| [Contact Compliance](capabilities/contact-compliance/CAPABILITY.md) | Engineering | Draft | Queries BOS collection note log at task generation time — if daily contact limit reached, task is not created. Subscribes to ContactWindowClosed for business hours enforcement. Does NOT own contact log data. |
 | [Template Library](capabilities/template-library/CAPABILITY.md) | Product | Draft | HQ-owned action type definitions. Typed outcomes per action. Required fields per outcome (e.g., PTP → amount + date). SLA defaults. Escalation rules (e.g., 3 failed calls → escalate to Visit). |
+| [Action Guide](capabilities/action-guide/CAPABILITY.md) | Product | Draft | Per-contract action intelligence on the Customer Page: Timing Signal Panel (when to act — priority, deadline countdown, urgency, days since last contact), Action Approach Guide (how to act — by portfolio type, urgency tier, objective stage), Talking Points Engine (configurable scripts per objective), Required Outcome Reminder. |
+| [AM Worklist](capabilities/am-worklist/CAPABILITY.md) | Product | Draft | AM's operational contract list — สัญญาที่อยู่ภายใต้การดูแลของพื้นที่. Auto-escalated from expired เอาวันนัดชำระ tasks + manually pulled by AM from branch collection list. AM actions: AM assign (มอบหมายงาน), legal action (ดำเนินคดี), find new address (หาที่อยู่ใหม่). |
+
+---
+
+## Capability Map
+
+```mermaid
+flowchart TD
+    subgraph STAGE1["📋 Stage 1 — HQ Configuration (One-time Setup)"]
+        TL["📚 Template Library\nDefines action types · outcomes · SLAs · escalation rules"]
+        PE_CONFIG["🎯 Playbook Engine\nHQ builds System Templates per portfolio × urgency tier\nDefines Objective Chain + Outcome Routing"]
+        TL --> PE_CONFIG
+    end
+
+    subgraph STAGE2["📥 Stage 2 — Event Ingestion (Automated)"]
+        EVENT(["Contract Event\nDaVinci / Core Banking / Onigiri / Matcha"])
+        PE_CLASSIFY["🎯 Playbook Engine\nClassifies → P1–P4 Priority\nCalculates urgency · Determines active Objective"]
+        TE_CREATE["⚙️ Task Engine\nCreates task · Auto-assigns to CO\nCREATED → ASSIGNED"]
+        EVENT --> PE_CLASSIFY
+        PE_CLASSIFY --> TE_CREATE
+    end
+
+    subgraph STAGE3["👤 Stage 3 — CO Daily Execution"]
+        WQ["📋 Work Queue\nCO sees tasks in P1–P4 priority buckets\nOpens customer page · Records outcome"]
+        AG["💡 Action Guide\nTiming signals · Approach guidance\nTalking points · Required outcome fields"]
+        CC["🛡️ Contact Compliance\nEnforces daily contact limits\nVerifies calls via 3CX"]
+        TE_CLOSE["⚙️ Task Engine\nTask → ACTIVE → CLOSED"]
+        WQ --> AG
+        CC -.->|enforces limits on| WQ
+        WQ --> TE_CLOSE
+    end
+
+    subgraph STAGE4["🔄 Stage 4 — Outcome Routing (Automated)"]
+        PE_ROUTE["🎯 Playbook Engine\nRoutes to next Objective in chain\nor escalates contract to AM"]
+    end
+
+    subgraph STAGE5["👔 Stage 5 — Management Oversight"]
+        PD["📊 Performance Dashboard\nSupervisor monitors team workload\nException alerts · Leaderboard · DPD movement"]
+        AW["📁 AM Worklist\nAM acts on escalated contracts\nAssign · Legal action · Find new address"]
+    end
+
+    STAGE1 -.->|templates ready| STAGE2
+    TE_CREATE --> WQ
+    TE_CLOSE --> PE_ROUTE
+    PE_ROUTE -->|next Objective| TE_CREATE
+    PE_ROUTE -->|no-action escalation| AW
+    TE_CLOSE -.->|real-time data| PD
+    PD --> AW
+```
 
 ---
 

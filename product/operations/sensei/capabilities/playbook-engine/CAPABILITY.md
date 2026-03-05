@@ -99,31 +99,48 @@ Every contract event that enters Sensei is classified into one of four priority 
 Collection for a contract follows a sequential chain of four Objectives. Each Objective is a self-contained playbook stage. Completing one Objective advances to the next. The chain terminates only when an End Condition is met.
 
 ```
-┌──────────────────────┐
-│  เอาวันนัดชำระ        │  ← Triggered by P2 events (สัญญาใกล้ due / ไม่มีนัดชำระ)
-└──────────┬───────────┘
-           │ ได้วันนัดชำระ
-┌──────────▼───────────┐
-│  แจ้งเตือนยืนยัน      │  ← Triggered 1 day before appointment
-│  นัดชำระ             │
-└──────────┬───────────┘
-           │ สัญญาว่าจะชำระ
-┌──────────▼───────────┐
-│  เก็บยอดตาม           │  ← Triggered on appointment date
-│  นัดชำระ             │
-└──────────┬───────────┘
-           │ ไม่ชำระ / ปฏิเสธ
-┌──────────▼───────────┐
-│  ติดตามเข้มงวด        │  ← Triggered when contract enters strict follow-up list
-└──────────┬───────────┘
-           │ outcomes route back up the chain or end
-           ▼
-    END CONDITIONS (see below)
+                         risk (contract enters)
+                               │
+          ┌────────────────────▼─────────────────────┐
+          │         เอาวันนัดชำระ                     │
+          │         DL: d  │  attempts: 3             │
+          └──┬──────────┬──────────┬──────────────────┘
+             │          │          │          │
+          success   do not      hard       no action
+             │       success    reject          │
+             │          │          │            ▼
+             │          └────┬─────┘    🔒 ส่งเรื่องให้ผู้จัดการพื้นที่
+             │               ▼            (AM assign / legal action /
+             │    ┌──────────────────────┐  find new address)
+             │    │   ติดตามเข้มงวด      │◀──────────────────────────┐
+             │    │   DL: d+3 | att: 1   │                           │
+             │    │   DL: PTP+1 | att: 1 │                           │
+             │    └──────┬──────────┬────┘                           │
+             │           │          │    │                            │
+             │        get PTP   paid full  no                        │
+             │           │          │    └──── re-queue ─────────────┘
+             │           └──┐       ▼
+             │              │     END ✅
+             ▼              │
+  ┌──────────────────────┐  │
+  │  แจ้งเตือนยืนยัน     │  │ (loop: get PTP in strict mode
+  │  นัดชำระ             │  │  re-enters at PTP+1)
+  │  DL: PTP-1 | att: 3  │  │
+  └──────────┬───────────┘  │
+             │ สัญญาว่าจะชำระ │
+  ┌──────────▼──────────────▼┐
+  │  เก็บยอดตามนัดชำระ       │  ← paid full? check
+  │  DL: PTP  │  att: 3      │
+  └──────────┬───────────────┘
+             │
+         paid full
+             ▼
+           END ✅
 ```
 
 **Chain transition rules:**
-- Any Objective can route to `ติดตามเข้มงวด` if the contract fails to produce a payment commitment.
-- `ติดตามเข้มงวด` can route back to `แจ้งเตือนยืนยันนัดชำระ` if a new appointment date is obtained.
+- `do not success` and `hard reject` both route to `ติดตามเข้มงวด` immediately.
+- `ติดตามเข้มงวด` — if a new PTP is obtained, re-enters `เก็บยอดตามนัดชำระ` at DL: PTP+1 (not back to แจ้งเตือน).
 - The chain does NOT restart from `เอาวันนัดชำระ` once an appointment exists.
 
 ---
@@ -134,12 +151,13 @@ Collection for a contract follows a sequential chain of four Objectives. Each Ob
 - **HQ defines**: the 4 Objective names, their sequence, and the default values for all parameters
 - **Supervisor (AM and above) can adjust**: `วันที่สร้างงาน` (creation trigger offset), `อายุของงาน` (task lifespan), and `Action ที่แนะนำ` — within limits set by HQ per urgency tier
 
-| Objective | วันที่สร้างงาน (default) | อายุของงาน (default) | Action ที่แนะนำ (default) | จำนวนทำซ้ำ |
-|-----------|------------------------|---------------------|--------------------------|------------|
-| เอาวันนัดชำระ | ก่อน due 7 วัน | 7 วัน | 📞 โทร | 3 ครั้ง |
-| แจ้งเตือนยืนยันนัดชำระ | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| เก็บยอดตามนัดชำระ | วันนัดชำระ | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| ติดตามเข้มงวด | วันที่ list ขึ้น | 3 วัน | 🏠 ลงพื้นที่ | 1 ครั้ง |
+| Objective | DL (Deadline) | วันที่สร้างงาน (default) | อายุของงาน (default) | Action ที่แนะนำ (default) | จำนวนทำซ้ำ |
+|-----------|--------------|------------------------|---------------------|--------------------------|------------|
+| เอาวันนัดชำระ | d (due date) | ก่อน due 7 วัน | 7 วัน | 📞 โทร | 3 ครั้ง |
+| แจ้งเตือนยืนยันนัดชำระ | PTP − 1 วัน | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 📞 โทร | 3 ครั้ง |
+| เก็บยอดตามนัดชำระ | PTP (วันนัดชำระ) | วันนัดชำระ | ภายในวัน | 📞 โทร | 3 ครั้ง |
+| ติดตามเข้มงวด — รอบแรก | d + 3 | วันที่ list ขึ้น | 3 วัน | 🏠 ลงพื้นที่ | 1 ครั้ง |
+| ติดตามเข้มงวด — หลังได้ PTP | PTP + 1 | วันถัดจากวันนัดใหม่ | ภายในวัน | 📞 โทร | 1 ครั้ง |
 
 > Higher urgency tiers may have tighter `อายุของงาน` defaults or earlier escalation to Visit in the HQ template. Supervisors adjust within those HQ-set bounds.
 
@@ -148,38 +166,41 @@ Collection for a contract follows a sequential chain of four Objectives. Each Ob
 ### 5. Outcome Routing per Objective
 
 #### เอาวันนัดชำระ
+*(DL: d — due date | attempts: 3)*
 
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ได้วันนัดชำระ | → แจ้งเตือนยืนยันนัดชำระ |
-| ไม่ได้วันนัดชำระ | → ติดตามเข้มงวด |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
-| ไม่ได้ทำ (หมดอายุ) | → 🔒 ส่งเรื่องให้ผู้จัดการพื้นที่ — **no new task created**; contract is moved into AM's responsible contract list (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่). AM decides whether to assign back to original branch, reassign to another branch, or handle directly. |
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ได้วันนัดชำระ | success | → แจ้งเตือนยืนยันนัดชำระ (DL: PTP−1) |
+| ไม่ได้วันนัดชำระ | do not success | → ติดตามเข้มงวด (DL: d+3) |
+| ปฏิเสธการชำระ | hard reject | → ติดตามเข้มงวด (DL: d+3) |
+| ไม่ได้ทำ (หมดอายุ) | no action | → 🔒 ส่งเรื่องให้ผู้จัดการพื้นที่ — **no new task created**; contract moves into AM's responsible list. AM actions: AM assign / legal action (ดำเนินคดี) / find new address (หาที่อยู่ใหม่) |
 
 #### แจ้งเตือนยืนยันนัดชำระ
+*(DL: PTP−1 | attempts: 3)*
 
 | ผลลัพธ์ | ขั้นตอนถัดไป |
 |--------|-------------|
-| สัญญาว่าจะชำระ | → เก็บยอดตามนัดชำระ |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
+| สัญญาว่าจะชำระ | → เก็บยอดตามนัดชำระ (DL: PTP) |
+| ปฏิเสธการชำระ | → ติดตามเข้มงวด (DL: d+3) |
 | นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ (re-trigger on new date) |
-| ติดต่อไม่ได้ | → ติดตามเข้มงวด |
+| ติดต่อไม่ได้ | → ติดตามเข้มงวด (DL: d+3) |
 
 #### เก็บยอดตามนัดชำระ
+*(DL: PTP — payment date | attempts: 3 — "paid full?" check)*
 
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ชำระตามยอดคาดการณ์ | → **สิ้นสุดการตาม** (End Chain ✅) |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด |
-| นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ (re-trigger on new date) |
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ชำระตามยอดคาดการณ์ | paid full | → **สิ้นสุดการตาม** (End Chain ✅) |
+| ไม่ชำระ / ชำระไม่ครบ | do not get payment / not full | → ติดตามเข้มงวด (DL: d+3) |
 
 #### ติดตามเข้มงวด
+*(รอบแรก DL: d+3 | att: 1 → หลังได้ PTP ใหม่ DL: PTP+1 | att: 1)*
 
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| ชำระตามยอดคาดการณ์ | → **สิ้นสุดการตาม** (End Chain ✅) |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด (re-queue) |
-| นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ |
+| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
+|--------|--------------|-------------|
+| ได้นัดชำระใหม่ | get PTP | → เก็บยอดตามนัดชำระ (re-enter at DL: PTP+1) |
+| ชำระตามยอดคาดการณ์ | paid full | → **สิ้นสุดการตาม** (End Chain ✅) |
+| ไม่ได้ผล | no | → ติดตามเข้มงวด (re-queue, loop) |
 
 ---
 
@@ -261,21 +282,20 @@ flowchart TD
     URGENCY --> TEMPLATE[Select Playbook Template\nportfolio_type × urgency_tier]
 
     TEMPLATE --> OBJ1[เอาวันนัดชำระ\n📞 7 days before due · 3 retries]
-    OBJ1 -->|ได้วันนัดชำระ| OBJ2[แจ้งเตือนยืนยันนัดชำระ\n📞 1 day before appt · 3 retries]
-    OBJ1 -->|ไม่ได้วันนัดชำระ / ปฏิเสธ| OBJ4[ติดตามเข้มงวด\n🏠 on list date · 1 retry]
-    OBJ1 -->|ไม่ได้ทำ| ESC[🔒 ส่งเรื่องให้ผู้จัดการพื้นที่]
+    OBJ1 -->|success\nได้วันนัดชำระ| OBJ2[แจ้งเตือนยืนยันนัดชำระ\n📞 DL: PTP−1 · 3 retries]
+    OBJ1 -->|do not success / hard reject\nไม่ได้วันนัดชำระ / ปฏิเสธ| OBJ4[ติดตามเข้มงวด\n🏠 DL: d+3 · 1 retry]
+    OBJ1 -->|no action\nไม่ได้ทำ| ESC[🔒 ส่งเรื่องให้ผู้จัดการพื้นที่\nAM assign / legal action / find new address]
 
-    OBJ2 -->|สัญญาว่าจะชำระ| OBJ3[เก็บยอดตามนัดชำระ\n📞 on appt date · 3 retries]
+    OBJ2 -->|สัญญาว่าจะชำระ| OBJ3[เก็บยอดตามนัดชำระ\n📞 DL: PTP · 3 retries]
     OBJ2 -->|ปฏิเสธ / ติดต่อไม่ได้| OBJ4
     OBJ2 -->|นัดวันใหม่| OBJ2
 
-    OBJ3 -->|ชำระตามยอดคาดการณ์| END_S[✅ สิ้นสุดการตาม]
-    OBJ3 -->|ปฏิเสธ| OBJ4
-    OBJ3 -->|นัดวันใหม่| OBJ2
+    OBJ3 -->|paid full\nชำระตามยอดคาดการณ์| END_S[✅ สิ้นสุดการตาม]
+    OBJ3 -->|do not get payment| OBJ4
 
-    OBJ4 -->|ชำระตามยอดคาดการณ์| END_S
-    OBJ4 -->|ปฏิเสธ| OBJ4
-    OBJ4 -->|นัดวันใหม่| OBJ2
+    OBJ4 -->|paid full\nชำระตามยอดคาดการณ์| END_S
+    OBJ4 -->|no\nไม่ได้ผล| OBJ4
+    OBJ4 -->|get PTP\nได้นัดชำระใหม่| OBJ3
 ```
 
 ---

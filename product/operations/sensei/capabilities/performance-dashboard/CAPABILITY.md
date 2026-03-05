@@ -30,8 +30,6 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 | Branch Performance Summary | Branch | Draft | Team-level metrics: daily scorecard, contact compliance, active playbooks, leaderboard |
 | Staff Self-Service Metrics | Branch (CO) | Draft | Personal metrics: tasks completed, PTP rate, visit success, SLA compliance |
 | Supervisor Home Dashboard | Supervisor (AM+) | Draft | งานที่พื้นที่ต้องจัดการ widget + branch performance tracking (daily & weekly) + area metrics |
-| AM's Responsible Contracts | Supervisor (AM+) | Draft | สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ — escalated or manually added contracts; AM assigns to branch or handles directly |
-| Branch Collection List (AM View) | Supervisor (AM+) | Draft | การติดตามหนี้ในแต่ละสาขา — full contract list per branch; AM can pull contracts into AM's responsible list |
 | Area Performance Summary | Supervisor (AM+) | Draft | ยอดสินเชื่อ / ยอดการขาย daily and monthly vs. target; DPD movement (C to X, X to 30) |
 
 ---
@@ -43,7 +41,7 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 | **Summary Widget** | งานที่ต้องจัดการ — count of active tasks in CO's queue | งานที่พื้นที่ต้องจัดการ — count of contracts in AM's responsible list |
 | **Work Setting** | การเรียงลำดับงาน / Strategy ในการทำงาน | การเรียงลำดับงาน / Strategy ในการทำงาน |
 | **Tracking Table** | Team workload per CO (queue size, completed, rate, PTP, alerts) | Branch performance per branch (ติดตามหนี้ + เสนอขาย metrics — วันนี้ and สัปดาห์นี้) |
-| **Collection List** | Priority-based contract queue (Work Queue) | สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ + การติดตามหนี้ในแต่ะสาขา |
+| **Collection List** | Priority-based contract queue (Work Queue) | → AM Worklist: สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ + การติดตามหนี้ในแต่ละสาขา |
 | **Performance Summary** | Daily / weekly / monthly scorecard + contact compliance | Daily and monthly area targets + DPD movement |
 
 ---
@@ -99,47 +97,9 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 | **ภาพรวมการทำงานเดือนนี้** | Monthly cumulative vs. target for same metrics |
 | **การไหลของ DPD** | DPD movement rates (C to X, X to 30) for current and prior month |
 
-#### B2. สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (AM's Responsible Contracts)
+#### B2 & B3: AM Contract Lists
 
-Contracts enter this list via two routes:
-1. **Auto-escalated** — "ส่งเรื่องให้ผู้จัดการพื้นที่" outcome on เอาวันนัดชำระ expiry. **No new task is created.** Contract moves here for AM to manage.
-2. **Manually added** — AM pulls a contract from การติดตามหนี้ในแต่ละสาขา.
-
-AM actions per contract: assign back to original branch, reassign to another branch in area, or handle directly.
-
-| Column | Description |
-|--------|-------------|
-| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
-| Due date | Relevant due date (color-coded: overdue = orange/red) |
-| สถานะการจ่าย | Payment status badge |
-| ยอดตามคาดการณ์ | Forecasted payment amount |
-| วันที่ติดต่อล่าสุด | Date of most recent contact |
-| ผลการติดต่อล่าสุด | Outcome of most recent contact |
-| สาขาต้นทาง | Source branch |
-| มอบหมายให้สาขา | Dropdown: assign to branch (or keep with AM) |
-| หมายเหตุ | Free-text note |
-
-#### B3. การติดตามหนี้ในแต่ละสาขา (Branch Collection List — AM View)
-
-AM reads each branch's full contract list and can pull contracts into AM's responsible list. Clicking a row opens the customer page (same drill-through as Work Queue).
-
-**Filters**: Search by ชื่อ-นามสกุล / เลขที่สัญญา / เบอร์โทร / เลขโปรเจคติด / เลขบัตรประชาชน; filter by เลขแมนเอดิต, ถ่วตัวรอง.
-
-| Column | Description |
-|--------|-------------|
-| ความเสี่ยง | Risk level (color-coded: เสี่ยงสูง red, เสี่ยงกลาง orange, เสี่ยงต่ำ green/blue) |
-| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
-| % ต่อพอร์ต | Contract weight as % of branch portfolio |
-| Due date | Relevant due date |
-| Action | Recommended action for current Objective |
-| ผลลัพธ์ที่คาดหวัง | Current Objective (e.g., เอาวันนัดชำระ) |
-| สถานการจ่าย | Payment status badge |
-| ยอดตามคาดการณ์ | Forecasted payment amount |
-| วันที่ติดต่อล่าสุด | Date of most recent contact |
-| ผลการติดตามล่าสุด | Outcome of most recent contact |
-| สาขา | Branch name |
-| ผู้รับผิดชอบเพิ่มเติม | Additional CO(s) assigned |
-| เรื่องกฎสัญญา | Compliance flag (⚠ if issue exists) |
+Moved to **AM Worklist** capability — see [CAPABILITY.md](../am-worklist/CAPABILITY.md).
 
 ---
 
@@ -150,5 +110,3 @@ AM reads each branch's full contract list and can pull contracts into AM's respo
 | Real-time updates | Both dashboards update without page reload (near-real-time, ≤ 30 seconds) |
 | Exception alerting | Branch exceptions surfaced within 5 minutes of trigger condition |
 | Historical data | Monthly objectives and PTP data retained for at least 12 months |
-| AM escalation atomicity | When "ส่งเรื่องให้ผู้จัดการพื้นที่" fires, contract must appear in AM's list atomically — no task gap, no duplicate |
-| Branch list performance | การติดตามหนี้ในแต่ละสาขา must render within 2 seconds for full branch portfolio |
