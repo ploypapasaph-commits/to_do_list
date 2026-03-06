@@ -31,6 +31,8 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 | Staff Self-Service Metrics | Branch (CO) | Draft | Personal metrics: tasks completed, PTP rate, visit success, SLA compliance |
 | Supervisor Home Dashboard | Supervisor (AM+) | Draft | งานที่พื้นที่ต้องจัดการ widget + branch performance tracking (daily & weekly) + area metrics |
 | Area Performance Summary | Supervisor (AM+) | Draft | ยอดสินเชื่อ / ยอดการขาย daily and monthly vs. target; DPD movement (C to X, X to 30) |
+| Action Verification Status | Branch | Draft | Per Call task: ✅ Verified / ⚠️ Unverified / ❌ Mismatch — cross-referenced against BOS collection note log after task closure (trust-but-verify; does not block CO workflow) |
+| Supervisor Mismatch Panel | Branch (Supervisor) | Draft | Surface Unverified and Mismatch Call tasks in supervisor exception panel for review |
 
 ---
 
@@ -47,6 +49,20 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 ---
 
 ## Business Rules
+
+---
+
+### Action Verification Rules (Trust-but-Verify)
+
+After a Call task is closed, Sensei cross-references the recorded outcome against the BOS collection note log asynchronously — this does not block the CO's workflow.
+
+| Verification Status | Meaning | Supervisor Action |
+|--------------------|---------|--------------------|
+| ✅ Verified | Call log confirms contact was made | No action needed |
+| ⚠️ Unverified | No matching call log found | Surface in exception panel for review |
+| ❌ Mismatch | Log contradicts outcome (e.g., "PTP" recorded but no matching call) | Surface in exception panel; may require investigation |
+
+Verification status is displayed on each Call task row. Unverified and Mismatch tasks are surfaced in the supervisor exception panel.
 
 ---
 
@@ -71,6 +87,7 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 | Contact Blocked | Customer reached daily contact limit | Acknowledge, plan next-day |
 | Playbook Stuck | Step awaiting supervisor approval | Approve / reject |
 | SLA Breach | Task overdue by > 4 hours | Reassign or escalate |
+| Verification Mismatch | Call outcome contradicts BOS call log | Review, investigate |
 
 #### A3. Branch Performance Summary
 

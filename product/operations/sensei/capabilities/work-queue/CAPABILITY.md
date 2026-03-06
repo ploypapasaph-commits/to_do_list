@@ -29,7 +29,6 @@ Present field staff with a prioritized work queue organized by event priority (P
 | Contract Table View | Draft | Sortable table per priority bucket with all key contract fields |
 | Customer Page Drill-Through | Draft | Clicking a contract row opens the customer page with collection log and notes |
 | One-by-One Processing Mode | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
-| Rapid-Fire Processing Mode | Draft | Extended mode: single-card focus within a priority bucket, large outcome targets, auto-advance |
 | Daily Contact Limit Enforcement | Draft | Auto-skip / flag contracts when customer's daily contact limit is reached |
 | Queue Overview Header | Draft | Top-level summary: total contracts today, completed, overdue, contact-blocked |
 
@@ -83,18 +82,6 @@ Clicking any contract row opens the **customer page**, which contains:
 4. Record outcome from the action's defined outcome list
 5. Fill conditional fields required by outcome (e.g., PTP → amount + date)
 6. Save and return to the queue table; completed task removed from the bucket
-
-### Rapid-Fire Processing Mode
-
-An accelerated mode for experienced COs processing high-volume buckets:
-
-- Triggered by "Start Queue ▶" on a priority bucket
-- One contract at a time, full context pre-loaded (same as customer page)
-- Large tap targets for common outcomes
-- "Save → Next ▶" auto-advances to the next contract in the bucket
-- Progress bar shows "X of Y" with completion percentage
-- Real-time contact limit display; blocks further contact if limit reached
-- Exitable at any time to return to the standard table view
 
 ### Daily Contact Limit Rules
 
