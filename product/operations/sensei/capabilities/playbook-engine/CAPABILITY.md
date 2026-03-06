@@ -10,7 +10,7 @@
 
 ## Business Function
 
-Provide a structured, reusable system for defining multi-step operational strategies (Playbooks) that drive how field staff handle specific collection objectives. Playbooks are triggered by priority-classified events, configured per portfolio type and collection urgency, and organized into a sequential 4-stage Objective Chain. Each stage leads to the next unless the contract reaches an end condition (full payment, restructure, or repossession).
+Provide a structured, reusable system for defining multi-step operational strategies (Playbooks) that drive how field staff handle specific collection objectives. Playbooks are triggered by priority-classified events, configured per portfolio type and collection urgency, and organized into a sequential N-stage Objective Chain (4 stages by default; HQ can add new objectives). Each stage follows the same chain structure. Advancing to the next stage or terminating depends on outcomes — full payment, restructure, or repossession end the chain.
 
 ## Why It Exists (First Principles)
 
@@ -27,7 +27,7 @@ Provide a structured, reusable system for defining multi-step operational strate
 |---------|--------|-------------|
 | Event Trigger Processor | Draft | Classifies incoming contract events by priority and routes to the correct playbook objective |
 | Collection Urgency Calculator | Draft | Computes `the_collection_urgency` from `risk_level` (active) or `easiness_to_collect` (write-off) |
-| Playbook Objective Chain | Draft | Manages the 4-stage chain (เอาวันนัดชำระ → แจ้งเตือนฯ → เก็บยอดฯ → ติดตามเข้มงวด); advances or terminates based on outcomes |
+| Playbook Objective Chain | Draft | Manages the N-stage chain (default: เอาวันนัดชำระ → แจ้งเตือนฯ → เก็บยอดฯ → ติดตามเข้มงวด); HQ can add new objectives to the chain — all follow the same structure. Advances or terminates based on outcomes. |
 | Playbook Builder (HQ) | Draft | HQ creates System Templates per portfolio type + urgency tier, with step sequences, action types, timing, outcome transitions, and compliance locks |
 | Branch Variant Fork | Draft | Supervisors fork a System Template into a Branch Variant with drag-and-drop step editing within allowed rules |
 | Compliance Lock Enforcement | Draft | Locked steps (🔒) cannot be removed, reordered past their boundary, or have outcome transitions modified |
@@ -37,23 +37,31 @@ Provide a structured, reusable system for defining multi-step operational strate
 
 ---
 
+## Relationship to Template Library
+
+Template Library is the **definition and governance layer** — it defines what components exist and who can change them. Playbook Engine is the **assembly and execution layer** — it reads those definitions to build and run strategies.
+
+| Template Library Component | Consumed by Playbook Engine | How |
+|---------------------------|----------------------------|-----|
+| Action Type Registry | Playbook Builder | Available action types when building step sequences; no action type can be used unless defined here |
+| Objective Configurations | Objective Chain + Task creation | Task creation timing (วันที่สร้างงาน), lifespan (อายุของงาน), retry counts per objective |
+| Urgency Tier Mapping | Collection Urgency Calculator | Maps risk_level / easiness_to_collect scores → urgency tier → template selection |
+| Priority Event Mapping | Event Trigger Processor | Maps incoming contract events → priority tier + trigger date |
+| Compliance-locked steps | Compliance Lock Enforcement | Which step categories HQ has designated as locked; Playbook Engine enforces at runtime |
+| Setting Governance | — | Governance only — defines who can change what; not consumed at runtime |
+
+---
+
 ## Configuration Ownership
 
-All business logic components of the Playbook Engine are **fully configurable** — they can be added to, adjusted, or changed by the appropriate role. The only fixed element is the **Objective Configurations structure** (its columns/schema), which is system-defined and immutable.
+Playbook Engine-specific configurable components (strategy assembly and sequencing). For all other settings (action types, urgency mappings, event triggers, objective timing, compliance locks), see **[Template Library → Setting Governance](../template-library/CAPABILITY.md)**.
 
 | Component | Add | Adjust | Change | Who |
 |-----------|-----|--------|--------|-----|
-| Priority Tiers | ✅ | ✅ | ✅ | HQ |
-| Events per Priority | ✅ | ✅ | ✅ | HQ |
-| `the_collection_urgency` mapping & thresholds | ✅ | ✅ | ✅ | HQ |
-| Objectives (names, sequence, number of stages) | ✅ | ✅ | ✅ | HQ |
+| Objective Chain structure (names, sequence, number of stages) | ✅ | ✅ | ✅ | HQ |
 | Outcome Routing per Objective | ✅ | ✅ | ✅ | HQ |
 | Playbook Templates (per portfolio_type × urgency_tier) | ✅ | ✅ | ✅ | HQ |
 | Branch Variants | ✅ | ✅ | ✅ | AM and above |
-| Objective Configurations **values** (timing, lifespan, action) | ✅ | ✅ | ✅ | HQ (defaults) / AM+ (within HQ limits) |
-| Objective Configurations **structure** (columns/schema) | ❌ | ❌ | ❌ | System-defined — immutable |
-
-> The Objective Configurations structure defines the **fields** each Objective must have: `วันที่สร้างงาน`, `อายุของงาน`, `Action ที่แนะนำ`, `จำนวนทำซ้ำ`. This schema is fixed. The **values** within those fields are fully configurable per role.
 
 ---
 
@@ -61,19 +69,23 @@ All business logic components of the Playbook Engine are **fully configurable** 
 
 ### 1. Event Triggers by Priority
 
-Every contract event that enters Sensei is classified into one of four priority tiers. Priority determines queue ordering in the Work Queue and which playbook objective is activated.
+Every contract event is classified into one of four priority tiers. Priority determines queue ordering in the Work Queue and which playbook objective is activated. Trigger dates and priority mappings are governed in **Template Library → Priority Event Mapping**; values below are defaults.
 
-| Priority | Event | Meaning |
-|----------|-------|---------|
-| **P1** | สัญญาถึงวันครบกำหนดชำระ | Contract is at its due date today |
-| **P1** | สัญญาที่มีนัดชำระในวันนี้ | Contract has a scheduled payment appointment today |
-| **P2** | สัญญาใกล้วันครบกำหนดชำระ | Contract approaching due date (pre-due window) |
-| **P2** | แจ้งเตือนก่อนนัดชำระ | Reminder before a scheduled payment appointment |
-| **P3** | ไม่มีวันนัดชำระ | Contract has no payment appointment set |
-| **P3** | ตัวที่หลุด | Contract missed a previous payment commitment |
-| **P4** | Write Off | Contract classified as write-off; transferred to write-off portfolio |
+| Priority | Event | Trigger Date (default) | Objective Triggered |
+|----------|-------|------------------------|---------------------|
+| **P1** | สัญญาถึงวันครบกำหนดชำระ | due_date = today | ติดตามเข้มงวด (if no PTP) / เก็บยอดฯ (if PTP exists) |
+| **P1** | สัญญาที่มีนัดชำระในวันนี้ | PTP_date = today | เก็บยอดตามนัดชำระ |
+| **P2** | สัญญาใกล้วันครบกำหนดชำระ | due_date − 7 days | เอาวันนัดชำระ |
+| **P2** | แจ้งเตือนก่อนนัดชำระ | PTP_date − 1 day | แจ้งเตือนยืนยันนัดชำระ |
+| **P3** | ไม่มีวันนัดชำระ | daily check: no PTP_date set | เอาวันนัดชำระ |
+| **P3** | ตัวที่หลุด | PTP_date < today with no payment recorded | ติดตามเข้มงวด |
+| **P4** | Write Off | contract.status → write_off | Write-off playbook |
 
-**Rule**: Higher priority events surface first in the CO's Work Queue within each action bucket. Within the same priority, contracts are sorted by `the_collection_urgency` (highest urgency first).
+**Queue Structure**: Contracts in the Work Queue are grouped and sorted in three levels:
+
+1. **Priority** — P1 first, then P2, P3, P4
+2. **Event** — within each priority tier, contracts are grouped by the event that triggered them (e.g., under P1: สัญญาถึงวันครบกำหนดชำระ group, then สัญญาที่มีนัดชำระในวันนี้ group)
+3. **Collection Urgency Score** — within each event group, contracts are sorted by `the_collection_urgency` (highest urgency first), surfacing the highest-risk contracts at the top
 
 ---
 
@@ -147,17 +159,11 @@ Collection for a contract follows a sequential chain of four Objectives. Each Ob
 
 ### 4. Objective Configurations
 
-**Ownership split:**
-- **HQ defines**: the 4 Objective names, their sequence, and the default values for all parameters
-- **Supervisor (AM and above) can adjust**: `วันที่สร้างงาน` (creation trigger offset), `อายุของงาน` (task lifespan), and `Action ที่แนะนำ` — within limits set by HQ per urgency tier
+Objective timing parameters — DL anchor, `วันที่สร้างงาน` offset, `อายุของงาน`, recommended action, and retry count — are defined and governed in **[Template Library → Objective Configurations](../template-library/CAPABILITY.md)**. Playbook Engine reads these values at task creation time.
 
-| Objective | DL (Deadline) | วันที่สร้างงาน (default) | อายุของงาน (default) | Action ที่แนะนำ (default) | จำนวนทำซ้ำ |
-|-----------|--------------|------------------------|---------------------|--------------------------|------------|
-| เอาวันนัดชำระ | d (due date) | ก่อน due 7 วัน | 7 วัน | 📞 โทร | 3 ครั้ง |
-| แจ้งเตือนยืนยันนัดชำระ | PTP − 1 วัน | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| เก็บยอดตามนัดชำระ | PTP (วันนัดชำระ) | วันนัดชำระ | ภายในวัน | 📞 โทร | 3 ครั้ง |
-| ติดตามเข้มงวด — รอบแรก | d + 3 | วันที่ list ขึ้น | 3 วัน | 🏠 ลงพื้นที่ | 1 ครั้ง |
-| ติดตามเข้มงวด — หลังได้ PTP | PTP + 1 | วันถัดจากวันนัดใหม่ | ภายในวัน | 📞 โทร | 1 ครั้ง |
+**Ownership split** (governed in Template Library):
+- **HQ defines**: default values for all parameters, and can add new objectives to the chain (N-stage)
+- **AM and above can adjust**: `วันที่สร้างงาน`, `อายุของงาน`, and `Action ที่แนะนำ` — within HQ-set limits per urgency tier
 
 > Higher urgency tiers may have tighter `อายุของงาน` defaults or earlier escalation to Visit in the HQ template. Supervisors adjust within those HQ-set bounds.
 
@@ -220,14 +226,7 @@ The playbook chain terminates for a contract when any of the following condition
 
 ### 7. Step Action Types
 
-| Action Type | Icon | Possible Outcomes |
-|-------------|------|------------------|
-| Call | 📞 | PTP, No Answer, Refused, Callback, Wrong Number, Line Busy, Voicemail |
-| Visit | 🏠 | Met Customer, Not Home, Address Invalid, PTP (in-person), Refused |
-| Admin | 📋 | Completed, Incomplete, Escalated |
-| Wait | ⏳ | Auto-advances after duration (no manual outcome) |
-| Notify Supervisor | 🔔 | Acknowledged, No Response |
-| Send Notification | 📧 | Auto-dispatched; Delivered / Failed |
+Action types, their outcomes, and required fields per outcome are defined and governed in **[Template Library → Action Type Registry](../template-library/CAPABILITY.md)**. Playbook Builder references these definitions when assigning action types to steps — no action type can be used in a playbook unless it exists in the registry.
 
 ### 8. Outcome Transition Types
 
