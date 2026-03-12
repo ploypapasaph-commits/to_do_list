@@ -54,6 +54,7 @@ The authoritative financial ledger for all loan accounts. Core Banking owns the 
 - DaVinci → `LoanDPDChanged` event (DPD bucket change: e.g., 0→1, 30→31, 90→91) → via event
 - DaVinci → `LoanClosed` event (account settled or written off) → via event
 - Onigiri → `CreateFacilityResult` (loan account ID, confirmation) → via synchronous API response
+- Onigiri → `FundTransferResult` (fund transfer outcome: success / failure, with `transferReferenceId`) → via webhook callback
 
 ---
 

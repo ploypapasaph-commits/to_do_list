@@ -47,7 +47,7 @@ The enterprise Golden Record — a single, deduplicated, consent-gated customer 
 - Loan origination workflow (owned by **Onigiri**)
 
 **KNOWN GAPS** (identified in architecture gap analysis):
-- Collateral Master Data capability not yet defined in ATLAS — Onigiri captures collateral; cross-product visibility requires a DaVinci home
+- ~~Collateral Master Data capability not yet defined~~ — **RESOLVED 2026-03-06**: Collateral Master Data is now owned by **Genesis** ([genesis/PRODUCT.md](../../genesis/PRODUCT.md)). DaVinci is not responsible for collateral storage or visibility.
 - `davinci_customer_id` vs. National ID as primary lookup key — unresolved in ARCHITECTURE.md
 - REST Query API contract not yet specified in ARCHITECTURE.md
 
@@ -64,6 +64,11 @@ The enterprise Golden Record — a single, deduplicated, consent-gated customer 
 - Sensei → customer.resolution_required events (triggers Admin task creation) → via event
 - Matcha → T3 verification task request (identity evidence) → via POST /task API
 - Onigiri, Sensei, Branch Dashboards, Collection Systems, Risk Analytics → customer profile and product summary → via REST Query API
+
+**Relationship with Genesis:**
+- DaVinci and Genesis are sibling products within the Platform portfolio. Together they form the **Master Data** layer.
+- DaVinci owns **customer identity**. Genesis owns **contracts and collaterals**. Neither product stores the other's data.
+- Cross-referencing (e.g. "which contracts belong to customer X?") is resolved by downstream consumers joining DaVinci's customer ID with Genesis's contract records — neither product is the join owner.
 
 ---
 

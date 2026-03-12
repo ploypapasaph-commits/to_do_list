@@ -2,7 +2,7 @@
 
 > **Project:** Onigiri (LOS — Loan Origination System 2.0) + Matcha (Document Verification Service)
 > **Status:** Draft
-> **Last Updated:** 2026-02-18
+> **Last Updated:** 2026-03-06
 > **Prerequisites:** [Blueprint-02 (Credit Approval)](../02-Credit_Approval/Architecture-02-Credit-Approval.md)
 > **BA Reference:** [Product Capabilities](./Product%20Capabilities.md)
 
@@ -138,9 +138,29 @@ DraftApplicationDocument (MongoDB, modified) ──── adds documentVerificat
 
 | Entity | Purpose |
 |--------|---------|
-| **document_verification_mapping** (new) | Config: maps upload boxes to Matcha document type keys + JSONPath data extraction config. |
+| **document_verification_mapping** (new) | Config: maps upload boxes to Matcha document type keys + JSONPath data extraction config. One row per upload box per collateral type. Includes a `conditional_expr` column for document types that are conditionally included (e.g., DLT web page photo excluded for specific act types). |
 | **application** (modified) | Adds `matcha_task_uuid` for cross-system tracing. |
 | **DraftApplicationDocument** (MongoDB, modified) | Adds `documentVerificationRejections` and `matchaCallbackPayload` fields. |
+
+**Document type keys by collateral type** (drives the `document_verification_mapping` seed data):
+
+| Collateral Type | Document Type Key | Condition |
+|----------------|------------------|-----------|
+| Car | `vehicle_registration_book` | Always |
+| Car | `vehicle_insurance` | Always |
+| Car | `vehicle_dlt_web_page` | Always — no act-type exclusion for Car |
+| Bike | `motorbike_registration_book` | Always |
+| Bike | `motorbike_insurance` | Always |
+| Bike | `motorbike_dlt_web_page` | Excluded when `act_type = RY-17` |
+| Tractor | `tractor_registration_book` | Always |
+| Tractor | `tractor_dlt_web_page` | Excluded when `act_type = RY-13` |
+| Land | `land_title_deed` | Always |
+| Land | `land_appraisal_certificate` | Always |
+| All | `applicant_id_card` | Always (shared base) |
+| All | `proof_of_income` | Always (shared base) |
+| All | `household_registration` | Always (shared base) |
+
+**carCheckConfig applicability:** `carCheckConfig` in the POST /task payload is **car-only**. For Bike, Tractor, and Land applications, `carCheckConfig` is omitted from the POST /task request. The Onigiri Worker determines `carCheckConfig` presence based on the campaign's collateral type.
 
 ---
 
@@ -452,7 +472,7 @@ sequenceDiagram
 | `callbackUrl` | string | Webhook URL for outcome notification |
 | `clientId` | string | Client system identifier (`"onigiri"`) |
 | `distributionConfig` | object | Opaque JSONB (JSON Binary) passed through to Raijin/Hephaestus for distribution |
-| `carCheckConfig.applicationId` | string | Haibara reference for receiving car check results (car check already initiated in BP-02) |
+| `carCheckConfig.applicationId` | string | Haibara reference for car check results. **Car applications only** — omitted entirely for Bike, Tractor, and Land. |
 | `documents[].documentTypeKey` | string | Matches Matcha's `document_type.key` |
 | `documents[].data` | object | Key-value pairs for data-item verification |
 | `documents[].fileUrls` | string[] | S3 presigned URLs for document images |
@@ -554,7 +574,9 @@ sequenceDiagram
 
 **Acceptance Criteria:**
 - Approve action publishes `create_facility` event to RabbitMQ within API PG TX
-- `document_verification_mapping` table seeded with upload box → Matcha document type key mappings
+- `document_verification_mapping` table seeded with upload box → Matcha document type key mappings for all supported collateral types (Car, Bike, Tractor, Land)
+- Conditional document rows (e.g., `motorbike_dlt_web_page` excluded for `act_type = RY-17`; `tractor_dlt_web_page` excluded for `act_type = RY-13`) evaluated correctly — excluded document types do not appear in POST /task `documents[]`
+- `carCheckConfig` populated only for Car applications; field omitted for Bike, Tractor, and Land
 - JSONPath extraction produces correct `data` key-value pairs per document type
 - `distributionConfig` builder produces valid opaque JSONB for Raijin/Hephaestus
 - `matcha_task_uuid` column added to `application` table
@@ -574,7 +596,7 @@ sequenceDiagram
 
 **Acceptance Criteria:**
 - Matcha repo bootstrapped (.NET 8 API + React Web)
-- `DocumentType` and `DocumentVerificationItem` config tables seeded (35 document types)
+- `DocumentType` and `DocumentVerificationItem` config tables seeded — existing 35 types plus new types for Bike (`motorbike_registration_book`, `motorbike_insurance`, `motorbike_dlt_web_page`), Tractor (`tractor_registration_book`, `tractor_dlt_web_page`), and Land (`land_title_deed`, `land_appraisal_certificate`) collateral types (42 total, pending final count confirmation)
 - POST /task creates `VerificationTask` in PENDING state, transitions to IN_PROGRESS on distribution
 - Re-flow via same clientReferenceKey creates new task version (not duplicate)
 - Raijin `work-entry` published (processId=1); task appears in Solomon QA worklist

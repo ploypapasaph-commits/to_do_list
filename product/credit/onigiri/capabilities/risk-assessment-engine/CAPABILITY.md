@@ -4,7 +4,7 @@
 **Portfolio**: Credit
 **Product Owner**: TBD (Credit PO / Risk Officer)
 **Status**: 📝 Draft — @FEATURE decomposition pending
-**Last Updated**: 2026-03-04
+**Last Updated**: 2026-03-09
 
 ---
 
@@ -29,6 +29,7 @@ Execute a configurable risk assessment strategy that evaluates loan applications
 | Risk Evaluation Executor | Concept | Run a named strategy against a JSON application object; produce aggregate risk level, deviation flags, required docs, and full evaluation trace |
 | Evaluation Trace Logger | Concept | Immutable per-evaluation log: which strategy/policy/rule was evaluated, what value was extracted, what comparison was made, what result was produced |
 | Rule Chaining (Route) | Concept | Rules can route evaluation to a specific policy or rule, enabling decision tree behavior without hardcoded branching |
+| Rule Change Authorization | Spec | Two-tier approval workflow for any strategy/rule modification — Tier 1 (parallel): Risk Officer + CPO; Tier 2: CRO. Runs on the Underwriting Workflow state machine engine. — [FEATURE](features/FEATURE_rule-change-authorization.md) |
 
 ---
 
@@ -91,6 +92,37 @@ Strategy (e.g., "CarTitleDefault")
 | 60 | CEO |
 | 70 | Auto-decline or special handling |
 | 99 | Auto-decline (policy violation) |
+
+### Rule Change Authorization
+
+Any modification to a strategy, policy, or rule requires a two-tier approval workflow before the change takes effect. No rule change is live until both tiers are approved.
+
+Tier 1 is a **parallel gate** — both functional owners must approve simultaneously (in any order) before the change advances to Tier 2.
+
+| Tier | Approver Role | Mode | Responsibility |
+|------|--------------|------|----------------|
+| Tier 1 | Risk Officer (functional owner of the strategy) | Parallel | Reviews the change for correctness, intent, and downstream policy impact |
+| Tier 1 | CPO (Chief Product Officer) | Parallel | Reviews the impact on active campaigns that reference this strategy |
+| Tier 2 | CRO (Chief Risk Officer) | Sequential (after both T1) | Final authorization — mandatory for all changes regardless of rule class |
+
+Both Tier 1 approvers must approve before the change advances to Tier 2. Either Tier 1 approver can reject, returning the change to Draft.
+
+**Rule class escalation:**
+
+| Rule Class | `risk_level` | Additional Requirement |
+|-----------|--------------|------------------------|
+| Standard | 10–60 | Tier 1 (parallel) + Tier 2 |
+| Auto-decline | 70, 99 | Tier 1 (parallel) + Tier 2 + Compliance notification (async, after CRO approval) |
+
+**Campaign coupling:**
+
+Because the CPO is a mandatory Tier 1 approver on every rule change, the impact on active campaigns is always reviewed alongside the risk change itself — neither side can be approved without the other functional owner's sign-off.
+
+All rule changes are recorded in the immutable audit trail with: actor ID, action type, previous and new state, both Tier 1 approver IDs, Tier 2 (CRO) approver ID, and affected campaign IDs.
+
+*Resolves audit finding AI-1.*
+
+---
 
 ### Aggregation Rule
 
