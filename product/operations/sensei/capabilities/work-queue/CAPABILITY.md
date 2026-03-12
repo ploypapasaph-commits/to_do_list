@@ -39,14 +39,23 @@ Present field staff with a prioritized work queue organized by event priority (P
 
 ### Queue Structure: Priority Buckets
 
-The queue is organized by **event priority**, not action type. Each priority bucket is a tab that contains a table of all contracts with active tasks at that priority level.
+The queue is organized by **priority**, not action type. Each priority bucket is a tab containing all contracts with active tasks at that level.
 
-| Priority | Events | Meaning |
-|----------|--------|---------|
-| **P1** | สัญญาถึงวันครบกำหนดชำระ · สัญญาที่มีนัดชำระในวันนี้ | Due today / Appointment today — highest urgency |
-| **P2** | สัญญาใกล้วันครบกำหนดชำระ · แจ้งเตือนก่อนนัดชำระ | Approaching due / Pre-appointment reminder |
-| **P3** | ไม่มีวันนัดชำระ · ตัวที่หลุด | No appointment set / Missed commitment |
-| **P4** | Write Off | Write-off portfolio contracts |
+Priority is assigned by Work Queue based on the contract's current state at display time — it is **not** set during task creation.
+
+| Priority | สถานะ Priority | Condition (evaluated from contract state) |
+|----------|----------------|------------------------------------------|
+| **P1** | สัญญาถึงวันครบกำหนดชำระ | `due_date = today` |
+| **P1** | สัญญาที่มีนัดชำระในวันนี้ | `PTP_date = today` |
+| **P2** | สัญญาใกล้วันครบกำหนดชำระ | `due_date − 7 days = today` |
+| **P2** | แจ้งเตือนก่อนนัดชำระ | `PTP_date − 1 day = today` |
+| **P2** | วันนัดเลยวันครบกำหนดชำระแล้ว แต่มีวันนัดชำระ | `due_date < today` AND `PTP_date` is set |
+| **P3** | เลยวันครบกำหนดชำระ แต่ยังไม่มีนัดชำระ | `PTP_date` is null AND `due_date < today` |
+| **P3** | ยังไม่ถึงวันครบกำหนดชำระ แต่ยังไม่มีนัดชำระ | `PTP_date` is null AND `due_date > today` (outside P1/P2 window) |
+| **P3** | ผู้จัดการพื้นที่ ตีกลับ | Contract returned from AM Worklist pool to branch CO queue |
+| **P4** | Write Off | `contract.status = write_off` |
+
+> Conditions are evaluated top-down — first matching condition wins. A contract's P-group can shift between sessions as its state changes (e.g., PTP set → moves from P3 to P2/P1). Work Queue always reads current contract state.
 
 ### Contract Table Columns
 
@@ -55,15 +64,16 @@ When a CO opens a priority bucket, they see a table with the following columns:
 | Column | Description |
 |--------|-------------|
 | Priority | P1 / P2 / P3 / P4 |
-| Customer Name | Full name of the contract holder |
-| Deadline (date) | The relevant due date or appointment date |
+| Priority Name | Thai status label for the contract's current priority condition (e.g., สัญญาถึงวันครบกำหนดชำระ, แจ้งเตือนก่อนนัดชำระ) |
 | Urgency | `the_collection_urgency` score for this contract |
-| Action | Recommended action from the current Objective (`โทร` / `ลงพื้นที่` / `Admin`) |
 | Objective | Current playbook objective (เอาวันนัดชำระ / แจ้งเตือนฯ / เก็บยอดฯ / ติดตามเข้มงวด) |
-| Payment Status | Current payment status of the contract |
-| Forecasted Amount | ยอดตามคาดการณ์ — the expected payment amount for this collection cycle |
+| Customer Name | Full name of the contract holder |
+| Deadline (date) | The relevant action deadline — PTP_date if set, otherwise due_date |
+| Due Date | Contract due date (`due_date`) from Core Banking |
 | Last Contact Date | Date of the most recent completed contact task |
 | Last Contact Result | Outcome of the most recent contact (e.g., PTP, No Answer, Refused) |
+| Payment Status | Current payment status of the contract |
+| Forecasted Amount | ยอดตามคาดการณ์ — the expected payment amount for this collection cycle |
 | Other Person in Charge | Other COs currently assigned to tasks on this contract |
 
 **Default sort order within each bucket**: Overdue → highest `the_collection_urgency` score → earliest Deadline.

@@ -84,10 +84,8 @@ flowchart TD
     end
 
     subgraph PLAYBOOK_PATH["Playbook Path (source = playbook_step)"]
-        PP1["① Priority Assignment\nP1–P4 · Work Queue grouping only"]
-        PP2{"② Dedup\nActive task exists\nfor this contract?"}
-        PP3["③ Template Selection\nby portfolio_type"]
-        PP4["④ Rule Chain Evaluation\nGate check → rules 1–5 in order → first match → Objective"]
+        PP1{"① Dedup\nActive task exists\nfor this contract?"}
+        PP2["② Gate + Rule Chain\nGate check → rules 1–5 in order → first match → Objective"]
     end
 
     subgraph EXT_PATH["External Path (source = external)"]
@@ -103,9 +101,9 @@ flowchart TD
     TASK(["✅ CREATED\n→ Task Lifecycle begins"])
     SUP(["🚫 Suppressed / Rejected"])
 
-    EV --> PP1 --> PP2
-    PP2 -->|"Yes — suppress"| SUP
-    PP2 -->|"No"| PP3 --> PP4 --> G1
+    EV --> PP1
+    PP1 -->|"Yes — suppress"| SUP
+    PP1 -->|"No"| PP2 --> G1
 
     EXT --> EP1 --> EP2
     EP2 -->|"Yes — suppress"| SUP
@@ -162,7 +160,7 @@ These are independent — do not conflate them.
 
 | Dimension | Determined By | Configured By | Drives |
 |-----------|--------------|--------------|--------|
-| **Priority (P1–P4)** | Which event fired + trigger condition | HQ in Playbook Engine → Priority Event Mapping per work domain | Which Work Queue **group** the contract appears in — grouping only; does not determine which Objective is activated |
+| **Priority (P1–P4)** | Contract state at display time (`due_date`, `PTP_date`, `contract.status` vs. today) | Work Queue — evaluated per contract each time the queue loads | Which Work Queue **group** the contract appears in — grouping only; does not determine which Objective is activated |
 | **Urgency Score** | Contract-level score (`risk_level`, `easiness_to_collect`, days-to-expiry) | Sourced from contract record — no HQ mapping | Sort order **within** a priority bucket; triage signal for COs |
 
 P1–P4 determines Work Queue grouping only. Objective selection is handled by the Rule Chain Evaluator based on contract attributes at evaluation time. Urgency score affects which contracts are worked first within the same group — not which group they land in.

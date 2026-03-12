@@ -10,7 +10,7 @@
 
 ## Business Function
 
-Single source of truth for collection task configuration and evaluation logic. Defines all configurable parameters (gate conditions, rule chain, action types, timing), evaluates each contract against those rules, and creates the correct task. Re-evaluates after every task closure so the next task emerges from updated contract state — no hardcoded transition routing needed.
+Single source of truth for task configuration and evaluation logic across all portfolio types. Defines all configurable parameters (gate conditions, rule chain, action types, timing), evaluates each contract against those rules, and creates the correct task. Re-evaluates after every task closure so the next task emerges from updated contract state — no hardcoded transition routing needed.
 
 ## Why It Exists (First Principles)
 
@@ -25,9 +25,8 @@ Single source of truth for collection task configuration and evaluation logic. D
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Event Trigger Processor | Draft | Classifies incoming contract events by priority (P1–P4) for Work Queue grouping. Signals the Gate Evaluator. Does not determine which objective to activate. |
-| Gate Evaluator | Draft | Checks contract eligibility and portfolio classification. Gate conditions are HQ-configurable per portfolio type. Suppresses evaluation if gate not met. |
-| Rule Chain Evaluator | Draft | Evaluates objective rules in fixed sequence against current contract attributes. First matching rule activates the objective. Falls back to ติดตามหนี้ if no rule matches. |
+| Gate Evaluator | Draft | On receiving a contract event, checks contract eligibility and portfolio classification. Gate conditions are HQ-configurable per portfolio type. Suppresses evaluation if gate not met. |
+| Rule Chain Evaluator | Draft | Runs the rule chain specific to the portfolio type identified by the gate. Each portfolio type has its own chain defined by HQ. Rules evaluated in fixed sequence — first match wins. |
 | Task Instantiation | Draft | Creates all step tasks atomically in the Task Engine when an objective is activated. Reads timing params from Objective Configurations. |
 | Re-entry Trigger | Draft | After a CO closes a task, re-enters the pipeline from the gate for that contract using updated contract attributes. |
 | Playbook Builder (HQ) | Draft | HQ creates and manages System Templates per portfolio type with action types, timing, and compliance locks. |
@@ -42,45 +41,31 @@ How a task gets created and appears in the Work Queue.
 
 ---
 
-### 1.1 Event Classification & Priority Grouping
-
-Every contract event is classified into one of four priority tiers. **Priority determines Work Queue grouping only** — it does not determine which objective is activated.
-
-| Priority | Event | Trigger Date (default) | Adjustable By |
-|----------|-------|------------------------|---------------|
-| **P1** | สัญญาถึงวันครบกำหนดชำระ | due_date = today | HQ only |
-| **P1** | สัญญาที่มีนัดชำระในวันนี้ | PTP_date = today | HQ only |
-| **P2** | สัญญาใกล้วันครบกำหนดชำระ | due_date − 7 days | HQ only |
-| **P2** | แจ้งเตือนก่อนนัดชำระ | PTP_date − 1 day | HQ only |
-| **P3** | ไม่มีวันนัดชำระ | daily check: no PTP_date set | HQ only |
-| **P3** | ตัวที่หลุด | PTP_date < today with no payment recorded | HQ only |
-| **P4** | Write Off | contract.status → write_off | HQ only |
-
-> Events are classification triggers only. Objective selection is handled by the Rule Chain Evaluator based on contract attributes at evaluation time.
-
----
-
-### 1.2 Gate — สัญญาที่ต้องติดตามหนี้
+### 1.1 Gate
 
 The gate is the **first check** on every evaluation — both on initial event and on re-entry after task closure. It does two things:
 
-1. **Eligibility check** — is this contract in a state that requires collection action?
+1. **Eligibility check** — is this contract in a state that requires action?
 2. **Portfolio classification** — which portfolio type does it belong to? (determines which rule chain and template apply)
 
-Gate conditions are **HQ-configurable per portfolio type**. If gate not met → suppress. No rule evaluation, no task created.
+Gate configurations are **HQ-managed per portfolio type** and stored in the Playbook Engine. HQ can register new portfolio types and define their gate conditions and rule chain without engineering changes — the engine evaluates whichever gate configurations are active. If gate not met → suppress. No rule evaluation, no task created.
 
-| Portfolio Type | Gate Conditions (default) |
-|---|---|
-| Collection: Active | ยอดที่ชำระ < ยอดตามคาดการณ์ AND due_date อยู่ในช่วง −7 ถึง +30 วันจากวันนี้ |
-| Collection: Write-off | contract.status = write_off AND ยอดค้างชำระ > 0 |
+Each registered portfolio type carries three things: its gate conditions, its rule chain, and its System Template. The gate identifies the portfolio type — everything that follows (rule chain evaluation, task instantiation) is scoped to that type.
 
-> When a contract is fully paid, the gate naturally fails on re-entry and no further tasks are created — no explicit "end chain" command needed.
+| Portfolio Type | Gate Conditions | Rule Chain |
+|---|---|---|
+| Collection: Active | ยอดที่ชำระ < ยอดตามคาดการณ์ AND due_date อยู่ในช่วง −7 ถึง +30 วันจากวันนี้ | Collection: Active (→ 1.2.1) |
+| Collection: Write-off | contract.status = write_off AND ยอดค้างชำระ > 0 | Collection: Write-off (→ 1.2.2) |
+
+> HQ adds new portfolio types by registering gate conditions + a rule chain together. The gate is not hardcoded to collection — it is a configurable construct. When a contract is fully paid, the gate naturally fails on re-entry and no further tasks are created — no explicit "end chain" command needed.
 
 ---
 
-### 1.3 Rule Chain Evaluation
+### 1.2 Rule Chain Evaluation
 
-After the gate passes, rules are evaluated in sequence. **First match wins.** Evaluation is stateless — reads only current contract attributes.
+Each portfolio type registered in the gate has its **own rule chain**, defined by HQ in the Playbook Builder. The gate identifies which portfolio type the contract belongs to — the engine then runs that type's chain. Rules are evaluated in sequence; **first match wins.** Evaluation is stateless — reads only current contract attributes.
+
+#### 1.2.1 Collection: Active
 
 | # | Objective | Conditions | Adjustable By |
 |---|---|---|---|
@@ -89,26 +74,30 @@ After the gate passes, rules are evaluated in sequence. **First match wins.** Ev
 | 3 | เก็บยอดตามนัดชำระ | PTP exists AND `PTP_date = today` AND no payment recorded | HQ only |
 | 4 | ติดตามเข้มงวด | `due_date` passed with no PTP OR PTP broken (`PTP_date < today`, no payment) | HQ only |
 | 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ | TBD | HQ only 🔒 |
-| Default | ติดตามหนี้ | Gate passes AND no rule above matched | HQ only |
+| Default | ติดตามหนี้ | No rule above matched | HQ only |
 
 **Worked examples:**
 
-| Contract Attributes | Event | P-Group | Objective Activated |
-|---|---|---|---|
-| No PTP, not yet overdue | สัญญาใกล้วันครบกำหนดชำระ | P2 | เอาวันนัดชำระ (Rule 1) |
-| PTP exists, PTP_date − 1 = today | แจ้งเตือนก่อนนัดชำระ | P2 | แจ้งเตือนยืนยันนัดชำระ (Rule 2) |
-| PTP exists, PTP_date = today | สัญญาที่มีนัดชำระในวันนี้ | P1 | เก็บยอดตามนัดชำระ (Rule 3) |
-| No PTP, due_date passed | สัญญาถึงวันครบกำหนดชำระ | P1 | ติดตามเข้มงวด (Rule 4) |
-| PTP broken (PTP_date < today, no payment) | ตัวที่หลุด | P3 | ติดตามเข้มงวด (Rule 4) |
-| Passes gate, no rule matched | any | any | ติดตามหนี้ (Default) |
+| Contract Attributes | Objective Activated |
+|---|---|
+| No PTP set | เอาวันนัดชำระ (Rule 1) |
+| PTP exists, PTP_date − 1 = today | แจ้งเตือนยืนยันนัดชำระ (Rule 2) |
+| PTP exists, PTP_date = today, no payment | เก็บยอดตามนัดชำระ (Rule 3) |
+| due_date passed with no PTP | ติดตามเข้มงวด (Rule 4) |
+| PTP broken (PTP_date < today, no payment) | ติดตามเข้มงวด (Rule 4) |
+| Passes gate, no rule matched | ติดตามหนี้ (Default) |
+
+#### 1.2.2 Collection: Write-off
+
+> Rule chain TBD — objectives and conditions to be defined with stakeholders.
 
 ---
 
-### 1.4 Task Instantiation
+### 1.3 Task Instantiation
 
 Once the objective is determined, Playbook Engine instructs Task Engine to create all step tasks atomically. Either all tasks are created or none.
 
-Tasks are created in `CREATED` state and auto-assigned per the template's assignee rules. The applicable System Template is determined by `portfolio_type` (set by the gate in 1.2). Contact gate checks (daily limit + contact window) apply before creation for Call and Visit tasks.
+Tasks are created in `CREATED` state and auto-assigned per the template's assignee rules. The applicable System Template is determined by `portfolio_type` (set by the gate in 1.1). Contact gate checks (daily limit + contact window) apply before creation for Call and Visit tasks.
 
 ---
 
@@ -254,7 +243,7 @@ This table is the **authoritative source** for role-based access across all Play
 | Retry limits per action type | ✅ | ✅ | ✅ | HQ (global default); AM (per branch variant, within HQ limits) |
 | Priority event mapping (event → P1–P4) | ✅ | ✅ | ✅ | HQ only |
 | Gate configurations (per portfolio type) | ✅ | ✅ | ✅ | HQ only |
-| Rule chain order and conditions | ❌ | ❌ | ❌ | HQ only — system-enforced |
+| Rule chain order and conditions (per portfolio type) | ✅ | ❌ | ❌ | HQ only — HQ defines each portfolio type's chain; order and conditions are system-enforced once set |
 | Objective timing & action (values) | ✅ | ✅ | ✅ | HQ (global default); AM (within HQ limits) |
 | Compliance-locked steps | ✅ | ❌ | ❌ | HQ only — lock/unlock |
 | Playbook Engine structure (schema) | ❌ | ❌ | ❌ | System-defined — immutable |
@@ -302,18 +291,22 @@ System Templates are organized by `portfolio_type`. HQ manages which template ap
 
 ```mermaid
 flowchart TD
-    EVENT[📥 Contract Event\nor Re-entry after task closure] --> PRIORITY[Classify Priority\nP1–P4 · Work Queue grouping only]
-    PRIORITY --> GATE{"Gate: สัญญาที่ต้องติดตามหนี้?\nEligibility + portfolio classification\n(HQ-configurable per portfolio type)"}
+    EVENT[📥 Contract Event\nor Re-entry after task closure] --> GATE{"Gate\nEligibility check +\nPortfolio classification\n(HQ-configurable per portfolio type)"}
 
-    GATE -->|Not met| SUPPRESS[🚫 No task created\nContract exits collection if re-entry]
-    GATE -->|Met| RULECHAIN[Rule Chain Evaluator\nEvaluate rules 1–5 in order\nFirst match wins]
+    GATE -->|Not met| SUPPRESS[🚫 No task created\nContract exits pipeline if re-entry]
+    GATE -->|"Collection: Write-off"| CHAIN_B[Rule Chain: Collection Write-off\nTBD]
 
-    RULECHAIN -->|Rule 1| OBJ1[เอาวันนัดชำระ\n📞 No PTP set]
-    RULECHAIN -->|Rule 2| OBJ2[แจ้งเตือนยืนยันนัดชำระ\n📞 PTP_date − 1 = today]
-    RULECHAIN -->|Rule 3| OBJ3[เก็บยอดตามนัดชำระ\n📞 PTP_date = today]
-    RULECHAIN -->|Rule 4| OBJ4[ติดตามเข้มงวด\n🏠 Overdue or PTP broken]
-    RULECHAIN -->|Rule 5| OBJ5[ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒]
-    RULECHAIN -->|Default| DEFT[ติดตามหนี้\n📞 Softer follow-up]
+    GATE -->|"Collection: Active"| R1{"Rule 1\nNo PTP set?"}
+    R1 -->|Match| OBJ1[เอาวันนัดชำระ 📞]
+    R1 -->|No match| R2{"Rule 2\nPTP_date − 1 = today?"}
+    R2 -->|Match| OBJ2[แจ้งเตือนยืนยันนัดชำระ 📞]
+    R2 -->|No match| R3{"Rule 3\nPTP_date = today, no payment?"}
+    R3 -->|Match| OBJ3[เก็บยอดตามนัดชำระ 📞]
+    R3 -->|No match| R4{"Rule 4\nOverdue or PTP broken?"}
+    R4 -->|Match| OBJ4[ติดตามเข้มงวด 🏠]
+    R4 -->|No match| R5{"Rule 5\nTBD?"}
+    R5 -->|Match| OBJ5[ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒]
+    R5 -->|No match| DEFT[ติดตามหนี้ 📞\nDefault]
 
     OBJ1 & OBJ2 & OBJ3 & OBJ4 & DEFT --> CGATE{"Contact Gate\nCall/Visit only"}
     CGATE -->|Passes| TASK[✅ Task CREATED\nCO works task · records outcome]
@@ -322,13 +315,15 @@ flowchart TD
     TASK -->|Outcome recorded\nContract attributes updated| EVENT
 ```
 
+> Each portfolio type registered in the gate has its own rule chain. The diagram above shows Collection: Active in full. Additional portfolio types (e.g., Write-off, Sales) follow the same pattern with their own rules defined by HQ.
+
 ---
 
 ## NFRs
 
 | NFR | Requirement |
 |-----|-------------|
-| Gate configurability | Gate conditions must be configurable per portfolio type by HQ without engineering changes |
+| Gate configurability | HQ must be able to register new portfolio types and configure gate conditions without engineering changes |
 | Re-entry atomicity | Re-entry evaluation and task creation after task closure must be atomic |
 | Compliance lock integrity | Locked steps cannot be removed or reordered by any user except HQ |
 | Version tracking | Branch variants must track which system template version they were forked from |

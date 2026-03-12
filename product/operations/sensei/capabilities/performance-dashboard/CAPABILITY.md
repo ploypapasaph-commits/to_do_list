@@ -27,7 +27,7 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 |---------|-------|--------|-------------|
 | Branch Home Dashboard | Branch | Draft | งานที่ต้องจัดการ widget + team performance summary + exception alerts |
 | Branch Performance Summary | Branch | Draft | Team-level metrics: daily scorecard, contact compliance, active playbooks, leaderboard |
-| Staff Self-Service Metrics | Branch (CO) | Draft | Personal metrics: tasks completed, PTP rate, visit success, SLA compliance |
+| Staff Self-Service Metrics | Branch (CO) | 💡 Good-to-Have | Personal metrics: tasks completed, PTP rate, visit success, SLA compliance. Not in current scope — deferred. |
 | Supervisor Home Dashboard | Supervisor (AM+) | Draft | งานที่พื้นที่ต้องจัดการ widget + branch performance tracking (daily & weekly) + area metrics |
 | Area Performance Summary | Supervisor (AM+) | Draft | ยอดสินเชื่อ / ยอดการขาย daily and monthly vs. target; DPD movement (C to X, X to 30) |
 
@@ -66,9 +66,9 @@ Provide a consistent dashboard structure across two access levels — **Branch**
 |-----------|---------|
 | Daily Scorecard | Team-level metrics: today / this week / this month / vs. target |
 | Active Playbooks Panel | Per-playbook: case count, on-track / at-risk / failed / succeeded |
-| Staff Self-Service Metrics | Personal: tasks completed, PTP rate, visit success, SLA compliance |
-| Monthly Objectives Tracker | Count of succeeded / in-progress / failed objectives per CO |
-| Branch Rank & Leaderboard | Gamified ranking within branch (🥇🥈🥉); composite score = completion rate + PTP rate + SLA compliance + contact compliance |
+| Staff Self-Service Metrics | 💡 Good-to-Have — Personal: tasks completed, PTP rate, visit success, SLA compliance. Not in current scope — deferred. |
+| Monthly Objectives Tracker | 💡 Good-to-Have — Count of succeeded / in-progress / failed objectives per CO. Deferred with Staff Self-Service Metrics. |
+| Branch Rank & Leaderboard | 💡 Good-to-Have — Gamified ranking within branch (🥇🥈🥉); composite score = completion rate + PTP rate + SLA compliance + contact compliance. Deferred with Staff Self-Service Metrics. |
 
 ---
 
