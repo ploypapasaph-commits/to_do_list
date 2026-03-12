@@ -4,20 +4,20 @@
 **Portfolio**: Operations
 **Product Owner**: TBD (Operations PO)
 **Status**: 📝 Draft — @FEATURE decomposition pending
-**Last Updated**: 2026-03-04
+**Last Updated**: 2026-03-12
 
 ---
 
 ## Business Function
 
-Provide a structured, reusable system for defining multi-step operational strategies (Playbooks) that drive how field staff handle specific collection objectives. Playbooks are triggered by priority-classified events, configured per portfolio type and collection urgency, and organized into a sequential N-stage Objective Chain (4 stages by default; HQ can add new objectives). Each stage follows the same chain structure. Advancing to the next stage or terminating depends on outcomes — full payment, restructure, or repossession end the chain.
+Single source of truth for collection task configuration and evaluation logic. Defines all configurable parameters (gate conditions, rule chain, action types, timing), evaluates each contract against those rules, and creates the correct task. Re-evaluates after every task closure so the next task emerges from updated contract state — no hardcoded transition routing needed.
 
 ## Why It Exists (First Principles)
 
-- **Policy Alignment**: Thousands of branch staff across hundreds of branches must execute consistent strategies. Without structured playbooks, each branch invents its own approach, causing inconsistent outcomes and compliance risk.
-- **Knowledge Codification**: Effective collection strategies are institutional knowledge. Playbooks capture this as executable templates, not tribal knowledge.
-- **Urgency-Aware Execution**: Not all contracts are equal. The intensity of follow-up (timing, action type, retry count) must reflect how urgent collection is for that specific contract — driven by risk level and portfolio type.
-- **Adaptability**: HQ defines the default strategy per urgency tier, but local conditions require branch-level customization within guardrails.
+- **Policy Alignment**: Thousands of branch staff must execute consistent strategies. Configurable rules replace tribal knowledge and branch-invented approaches.
+- **Separation of config and logic**: HQ defines what the rules are. The engine applies them. Changing a rule doesn't require changing the engine.
+- **Stateless evaluation**: Each evaluation reads only current contract attributes — no dependency on task history or chain state.
+- **Adaptability**: HQ defines defaults. Branches (AM and above) adjust timing within guardrails.
 
 ---
 
@@ -25,276 +25,301 @@ Provide a structured, reusable system for defining multi-step operational strate
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Event Trigger Processor | Draft | Classifies incoming contract events by priority and routes to the correct playbook objective |
-| Collection Urgency Calculator | Draft | Computes `the_collection_urgency` from `risk_level` (active) or `easiness_to_collect` (write-off) |
-| Playbook Objective Chain | Draft | Manages the N-stage chain (default: เอาวันนัดชำระ → แจ้งเตือนฯ → เก็บยอดฯ → ติดตามเข้มงวด); HQ can add new objectives to the chain — all follow the same structure. Advances or terminates based on outcomes. |
-| Playbook Builder (HQ) | Draft | HQ creates System Templates per portfolio type + urgency tier, with step sequences, action types, timing, outcome transitions, and compliance locks |
-| Branch Variant Fork | Draft | Supervisors fork a System Template into a Branch Variant with drag-and-drop step editing within allowed rules |
-| Compliance Lock Enforcement | Draft | Locked steps (🔒) cannot be removed, reordered past their boundary, or have outcome transitions modified |
-| Outcome Transition Router | Draft | Each step defines per-outcome transitions (Next Objective / Specific Step / Retry / End Chain / Escalate) |
-| Template Version Sync | Draft | HQ publishes new template version; branches with variants notified to review and merge changes |
-| Playbook Instantiation | Draft | When a playbook objective is triggered for a contract, step tasks are created atomically in the Task Engine |
+| Event Trigger Processor | Draft | Classifies incoming contract events by priority (P1–P4) for Work Queue grouping. Signals the Gate Evaluator. Does not determine which objective to activate. |
+| Gate Evaluator | Draft | Checks contract eligibility and portfolio classification. Gate conditions are HQ-configurable per portfolio type. Suppresses evaluation if gate not met. |
+| Rule Chain Evaluator | Draft | Evaluates objective rules in fixed sequence against current contract attributes. First matching rule activates the objective. Falls back to ติดตามหนี้ if no rule matches. |
+| Task Instantiation | Draft | Creates all step tasks atomically in the Task Engine when an objective is activated. Reads timing params from Objective Configurations. |
+| Re-entry Trigger | Draft | After a CO closes a task, re-enters the pipeline from the gate for that contract using updated contract attributes. |
+| Playbook Builder (HQ) | Draft | HQ creates and manages System Templates per portfolio type with action types, timing, and compliance locks. |
+| Branch Variant Fork | Draft | AM and above fork a System Template into a Branch Variant and adjust within allowed rules. |
+| Compliance Lock Enforcement | Draft | Locked steps (🔒) cannot be removed, reordered past their boundary, or have their configuration modified by supervisors. |
 
 ---
 
-## Relationship to Template Library
+## Part 1 — Task Creation
 
-Template Library is the **definition and governance layer** — it defines what components exist and who can change them. Playbook Engine is the **assembly and execution layer** — it reads those definitions to build and run strategies.
-
-| Template Library Component | Consumed by Playbook Engine | How |
-|---------------------------|----------------------------|-----|
-| Action Type Registry | Playbook Builder | Available action types when building step sequences; no action type can be used unless defined here |
-| Objective Configurations | Objective Chain + Task creation | Task creation timing (วันที่สร้างงาน), lifespan (อายุของงาน), retry counts per objective |
-| Urgency Tier Mapping | Collection Urgency Calculator | Maps risk_level / easiness_to_collect scores → urgency tier → template selection |
-| Priority Event Mapping | Event Trigger Processor | Maps incoming contract events → priority tier + trigger date |
-| Compliance-locked steps | Compliance Lock Enforcement | Which step categories HQ has designated as locked; Playbook Engine enforces at runtime |
-| Setting Governance | — | Governance only — defines who can change what; not consumed at runtime |
+How a task gets created and appears in the Work Queue.
 
 ---
 
-## Configuration Ownership
+### 1.1 Event Classification & Priority Grouping
 
-Playbook Engine-specific configurable components (strategy assembly and sequencing). For all other settings (action types, urgency mappings, event triggers, objective timing, compliance locks), see **[Template Library → Setting Governance](../template-library/CAPABILITY.md)**.
+Every contract event is classified into one of four priority tiers. **Priority determines Work Queue grouping only** — it does not determine which objective is activated.
 
-| Component | Add | Adjust | Change | Who |
-|-----------|-----|--------|--------|-----|
-| Objective Chain structure (names, sequence, number of stages) | ✅ | ✅ | ✅ | HQ |
-| Outcome Routing per Objective | ✅ | ✅ | ✅ | HQ |
-| Playbook Templates (per portfolio_type × urgency_tier) | ✅ | ✅ | ✅ | HQ |
-| Branch Variants | ✅ | ✅ | ✅ | AM and above |
+| Priority | Event | Trigger Date (default) | Adjustable By |
+|----------|-------|------------------------|---------------|
+| **P1** | สัญญาถึงวันครบกำหนดชำระ | due_date = today | HQ only |
+| **P1** | สัญญาที่มีนัดชำระในวันนี้ | PTP_date = today | HQ only |
+| **P2** | สัญญาใกล้วันครบกำหนดชำระ | due_date − 7 days | HQ only |
+| **P2** | แจ้งเตือนก่อนนัดชำระ | PTP_date − 1 day | HQ only |
+| **P3** | ไม่มีวันนัดชำระ | daily check: no PTP_date set | HQ only |
+| **P3** | ตัวที่หลุด | PTP_date < today with no payment recorded | HQ only |
+| **P4** | Write Off | contract.status → write_off | HQ only |
 
----
-
-## Business Rules
-
-### 1. Event Triggers by Priority
-
-Every contract event is classified into one of four priority tiers. Priority determines queue ordering in the Work Queue and which playbook objective is activated. Trigger dates and priority mappings are governed in **Template Library → Priority Event Mapping**; values below are defaults.
-
-| Priority | Event | Trigger Date (default) | Objective Triggered |
-|----------|-------|------------------------|---------------------|
-| **P1** | สัญญาถึงวันครบกำหนดชำระ | due_date = today | ติดตามเข้มงวด (if no PTP) / เก็บยอดฯ (if PTP exists) |
-| **P1** | สัญญาที่มีนัดชำระในวันนี้ | PTP_date = today | เก็บยอดตามนัดชำระ |
-| **P2** | สัญญาใกล้วันครบกำหนดชำระ | due_date − 7 days | เอาวันนัดชำระ |
-| **P2** | แจ้งเตือนก่อนนัดชำระ | PTP_date − 1 day | แจ้งเตือนยืนยันนัดชำระ |
-| **P3** | ไม่มีวันนัดชำระ | daily check: no PTP_date set | เอาวันนัดชำระ |
-| **P3** | ตัวที่หลุด | PTP_date < today with no payment recorded | ติดตามเข้มงวด |
-| **P4** | Write Off | contract.status → write_off | Write-off playbook |
-
-**Queue Structure**: Contracts in the Work Queue are grouped and sorted in three levels:
-
-1. **Priority** — P1 first, then P2, P3, P4
-2. **Event** — within each priority tier, contracts are grouped by the event that triggered them (e.g., under P1: สัญญาถึงวันครบกำหนดชำระ group, then สัญญาที่มีนัดชำระในวันนี้ group)
-3. **Collection Urgency Score** — within each event group, contracts are sorted by `the_collection_urgency` (highest urgency first), surfacing the highest-risk contracts at the top
+> Events are classification triggers only. Objective selection is handled by the Rule Chain Evaluator based on contract attributes at evaluation time.
 
 ---
 
-### 2. Collection Urgency Scoring
+### 1.2 Gate — สัญญาที่ต้องติดตามหนี้
 
-`the_collection_urgency` is calculated per contract and determines which playbook template configuration applies. It is derived from the portfolio type:
+The gate is the **first check** on every evaluation — both on initial event and on re-entry after task closure. It does two things:
 
-| Portfolio Type | Input Dimension | Scale | Priority Order | Interpretation |
-|----------------|----------------|-------|----------------|----------------|
-| **Active** | `risk_level` | 1 – 6 | Higher score first | 1 = lowest risk; 6 = highest risk / most delinquent — collect highest risk first |
-| **Write-Off** | `easiness_to_collect` | 1 – 7 | Higher score first | 7 = easiest to collect; 1 = hardest to collect — collect easiest first to maximize recovery rate |
+1. **Eligibility check** — is this contract in a state that requires collection action?
+2. **Portfolio classification** — which portfolio type does it belong to? (determines which rule chain and template apply)
 
-**Default sort order**: Within the same priority tier, contracts are sorted by **descending score** for both portfolios. For Write-Off, a score of 7 is the highest collection priority (easiest to recover); a score of 1 is the lowest (hardest to recover). This is the inverse of Active's risk interpretation but follows the same descending sort rule.
+Gate conditions are **HQ-configurable per portfolio type**. If gate not met → suppress. No rule evaluation, no task created.
 
-`the_collection_urgency` maps these scores to a playbook template variant. Higher urgency = more aggressive timing, lower retry tolerance, and earlier escalation to Visit.
+| Portfolio Type | Gate Conditions (default) |
+|---|---|
+| Collection: Active | ยอดที่ชำระ < ยอดตามคาดการณ์ AND due_date อยู่ในช่วง −7 ถึง +30 วันจากวันนี้ |
+| Collection: Write-off | contract.status = write_off AND ยอดค้างชำระ > 0 |
 
-> **Design note**: The mapping from `risk_level` / `easiness_to_collect` to urgency tiers (and thus to template variants) is configured by HQ in the Template Library. Sensei applies the mapping — it does not define the business thresholds.
-
----
-
-### 3. Playbook Objective Chain
-
-Collection for a contract follows a sequential chain of four Objectives. Each Objective is a self-contained playbook stage. Completing one Objective advances to the next. The chain terminates only when an End Condition is met.
-
-```
-                         risk (contract enters)
-                               │
-          ┌────────────────────▼─────────────────────┐
-          │         เอาวันนัดชำระ                     │
-          │         DL: d  │  attempts: 3             │
-          └──┬──────────┬──────────┬──────────────────┘
-             │          │          │          │
-          success   do not      hard       no action
-             │       success    reject          │
-             │          │          │            ▼
-             │          └────┬─────┘    🔒 ส่งเรื่องให้ผู้จัดการพื้นที่
-             │               ▼            (AM assign / legal action /
-             │    ┌──────────────────────┐  find new address)
-             │    │   ติดตามเข้มงวด      │◀──────────────────────────┐
-             │    │   DL: d+3 | att: 1   │                           │
-             │    │   DL: PTP+1 | att: 1 │                           │
-             │    └──────┬──────────┬────┘                           │
-             │           │          │    │                            │
-             │        get PTP   paid full  no                        │
-             │           │          │    └──── re-queue ─────────────┘
-             │           └──┐       ▼
-             │              │     END ✅
-             ▼              │
-  ┌──────────────────────┐  │
-  │  แจ้งเตือนยืนยัน     │  │ (loop: get PTP in strict mode
-  │  นัดชำระ             │  │  re-enters at PTP+1)
-  │  DL: PTP-1 | att: 3  │  │
-  └──────────┬───────────┘  │
-             │ สัญญาว่าจะชำระ │
-  ┌──────────▼──────────────▼┐
-  │  เก็บยอดตามนัดชำระ       │  ← paid full? check
-  │  DL: PTP  │  att: 3      │
-  └──────────┬───────────────┘
-             │
-         paid full
-             ▼
-           END ✅
-```
-
-**Chain transition rules:**
-- `do not success` and `hard reject` both route to `ติดตามเข้มงวด` immediately.
-- `ติดตามเข้มงวด` — if a new PTP is obtained, re-enters `เก็บยอดตามนัดชำระ` at DL: PTP+1 (not back to แจ้งเตือน).
-- The chain does NOT restart from `เอาวันนัดชำระ` once an appointment exists.
+> When a contract is fully paid, the gate naturally fails on re-entry and no further tasks are created — no explicit "end chain" command needed.
 
 ---
 
-### 4. Objective Configurations
+### 1.3 Rule Chain Evaluation
 
-Objective timing parameters — DL anchor, `วันที่สร้างงาน` offset, `อายุของงาน`, recommended action, and retry count — are defined and governed in **[Template Library → Objective Configurations](../template-library/CAPABILITY.md)**. Playbook Engine reads these values at task creation time.
+After the gate passes, rules are evaluated in sequence. **First match wins.** Evaluation is stateless — reads only current contract attributes.
 
-**Ownership split** (governed in Template Library):
-- **HQ defines**: default values for all parameters, and can add new objectives to the chain (N-stage)
-- **AM and above can adjust**: `วันที่สร้างงาน`, `อายุของงาน`, and `Action ที่แนะนำ` — within HQ-set limits per urgency tier
+| # | Objective | Conditions | Adjustable By |
+|---|---|---|---|
+| 1 | เอาวันนัดชำระ | No PTP set (`PTP_date` is null) | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | PTP exists AND `PTP_date − 1 day = today` | HQ only |
+| 3 | เก็บยอดตามนัดชำระ | PTP exists AND `PTP_date = today` AND no payment recorded | HQ only |
+| 4 | ติดตามเข้มงวด | `due_date` passed with no PTP OR PTP broken (`PTP_date < today`, no payment) | HQ only |
+| 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ | TBD | HQ only 🔒 |
+| Default | ติดตามหนี้ | Gate passes AND no rule above matched | HQ only |
 
-> Higher urgency tiers may have tighter `อายุของงาน` defaults or earlier escalation to Visit in the HQ template. Supervisors adjust within those HQ-set bounds.
+**Worked examples:**
 
----
-
-### 5. Outcome Routing per Objective
-
-#### เอาวันนัดชำระ
-*(DL: d — due date | attempts: 3)*
-
-| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
-|--------|--------------|-------------|
-| ได้วันนัดชำระ | success | → แจ้งเตือนยืนยันนัดชำระ (DL: PTP−1) |
-| ไม่ได้วันนัดชำระ | do not success | → ติดตามเข้มงวด (DL: d+3) |
-| ปฏิเสธการชำระ | hard reject | → ติดตามเข้มงวด (DL: d+3) |
-| ไม่ได้ทำ (หมดอายุ) | no action | → 🔒 ส่งเรื่องให้ผู้จัดการพื้นที่ — **no new task created**; contract moves into AM's responsible list. AM actions: AM assign / legal action (ดำเนินคดี) / find new address (หาที่อยู่ใหม่) |
-
-#### แจ้งเตือนยืนยันนัดชำระ
-*(DL: PTP−1 | attempts: 3)*
-
-| ผลลัพธ์ | ขั้นตอนถัดไป |
-|--------|-------------|
-| สัญญาว่าจะชำระ | → เก็บยอดตามนัดชำระ (DL: PTP) |
-| ปฏิเสธการชำระ | → ติดตามเข้มงวด (DL: d+3) |
-| นัดวันชำระใหม่ | → แจ้งเตือนยืนยันนัดชำระ (re-trigger on new date) |
-| ติดต่อไม่ได้ | → ติดตามเข้มงวด (DL: d+3) |
-
-#### เก็บยอดตามนัดชำระ
-*(DL: PTP — payment date | attempts: 3 — "paid full?" check)*
-
-| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
-|--------|--------------|-------------|
-| ชำระตามยอดคาดการณ์ | paid full | → **สิ้นสุดการตาม** (End Chain ✅) |
-| ไม่ชำระ / ชำระไม่ครบ | do not get payment / not full | → ติดตามเข้มงวด (DL: d+3) |
-
-#### ติดตามเข้มงวด
-*(รอบแรก DL: d+3 | att: 1 → หลังได้ PTP ใหม่ DL: PTP+1 | att: 1)*
-
-| ผลลัพธ์ | Diagram Label | ขั้นตอนถัดไป |
-|--------|--------------|-------------|
-| ได้นัดชำระใหม่ | get PTP | → เก็บยอดตามนัดชำระ (re-enter at DL: PTP+1) |
-| ชำระตามยอดคาดการณ์ | paid full | → **สิ้นสุดการตาม** (End Chain ✅) |
-| ไม่ได้ผล | no | → ติดตามเข้มงวด (re-queue, loop) |
+| Contract Attributes | Event | P-Group | Objective Activated |
+|---|---|---|---|
+| No PTP, not yet overdue | สัญญาใกล้วันครบกำหนดชำระ | P2 | เอาวันนัดชำระ (Rule 1) |
+| PTP exists, PTP_date − 1 = today | แจ้งเตือนก่อนนัดชำระ | P2 | แจ้งเตือนยืนยันนัดชำระ (Rule 2) |
+| PTP exists, PTP_date = today | สัญญาที่มีนัดชำระในวันนี้ | P1 | เก็บยอดตามนัดชำระ (Rule 3) |
+| No PTP, due_date passed | สัญญาถึงวันครบกำหนดชำระ | P1 | ติดตามเข้มงวด (Rule 4) |
+| PTP broken (PTP_date < today, no payment) | ตัวที่หลุด | P3 | ติดตามเข้มงวด (Rule 4) |
+| Passes gate, no rule matched | any | any | ติดตามหนี้ (Default) |
 
 ---
 
-### 6. End Conditions
+### 1.4 Task Instantiation
 
-The playbook chain terminates for a contract when any of the following conditions are met:
+Once the objective is determined, Playbook Engine instructs Task Engine to create all step tasks atomically. Either all tasks are created or none.
 
-| Condition | Trigger | Status |
-|-----------|---------|--------|
-| ชำระตามยอดตามคาดการณ์ | CO records full payment matching forecasted amount | ✅ End Chain (Success) |
-| Restructure | Contract restructured (terms renegotiated) | ✅ End Chain (Success) — TBD |
-| Repossession | Asset repossessed | ✅ End Chain (Closed) — TBD |
-
-> **Note**: Restructure and Repossession end conditions and their triggering events are to be defined in a future iteration.
+Tasks are created in `CREATED` state and auto-assigned per the template's assignee rules. The applicable System Template is determined by `portfolio_type` (set by the gate in 1.2). Contact gate checks (daily limit + contact window) apply before creation for Call and Visit tasks.
 
 ---
 
-### 7. Step Action Types
+## Part 2 — Execution
 
-Action types, their outcomes, and required fields per outcome are defined and governed in **[Template Library → Action Type Registry](../template-library/CAPABILITY.md)**. Playbook Builder references these definitions when assigning action types to steps — no action type can be used in a playbook unless it exists in the registry.
+How a CO works the task after it appears in their queue.
 
-### 8. Outcome Transition Types
+---
 
-| Transition | Meaning |
-|-----------|---------|
-| `→ Next Objective` | Advance to the next stage in the Objective Chain |
-| `→ Specific Objective` | Jump to a named objective (e.g., skip directly to ติดตามเข้มงวด) |
-| `→ Retry` | Repeat same step with max attempt limit |
-| `→ End Chain (Success)` | Contract fully resolved — remove from active worklist |
-| `→ End Chain (Failed)` | Chain exhausted without resolution — escalate or write off |
-| `→ Escalate` | Route to supervisor for manual decision |
-| `→ Re-trigger` | Re-trigger the same objective on a new date (e.g., new appointment) |
+### 2.1 Action Types
 
-### 9. Playbook Hierarchy
+Each objective is configured with a default action type. Action types are HQ-defined — no action type can be used unless it exists in the registry below.
 
-| Level | Owner | Can Edit? |
-|-------|-------|-----------|
-| System Template | HQ | Action types: HQ only. Timing and deadlines: AM and above |
-| Branch Variant | AM and above | Yes, within allowed edit rules |
+| Action Type | Typed Outcomes | Required Fields on Specific Outcomes |
+|-------------|----------------|--------------------------------------|
+| 📞 Call | PTP, No Answer, Refused, Callback, Wrong Number, Line Busy, Voicemail | PTP → PTP amount + PTP date; Callback → scheduled date/time |
+| 🏠 Visit | Met Customer, Not Home, Address Invalid, PTP (in-person), Refused | PTP → PTP amount + PTP date; Address Invalid → new address |
+| 📋 Admin | Completed, Incomplete, Escalated | Escalated → escalation reason |
+| ⏳ Wait | (auto-advances; no manual outcome) | — |
+| 🔔 Notify Supervisor | Acknowledged, No Response | — |
+| 📧 Send Notification | (system-dispatched; Delivered/Failed) | — |
 
-System Templates are organized by `portfolio_type` × `urgency_tier` but are **not strictly one-to-one** — the same template can be assigned to multiple combinations if the strategy is identical. HQ manages which template applies to which combination. Branches (AM role and above) fork Branch Variants from those templates, and can adjust timing and deadlines within HQ-set limits.
+**Default action per objective** (AM can adjust within HQ limits):
 
-### 10. Supervisor Edit Rules
+| Objective | Default Action |
+|---|---|
+| เอาวันนัดชำระ | 📞 Call |
+| แจ้งเตือนยืนยันนัดชำระ | 📞 Call |
+| เก็บยอดตามนัดชำระ | 📞 Call |
+| ติดตามเข้มงวด — รอบแรก | 🏠 Visit 🔒 |
+| ติดตามหนี้ | 📞 Call |
+
+---
+
+### 2.2 Outcome Recording
+
+CO records one outcome per task on closure. Each outcome updates one or more contract attributes, which are what the rule chain reads on re-entry.
+
+| Outcome | Contract Attribute Updated |
+|---|---|
+| PTP date set | `PTP_date` |
+| Payment recorded | `payment_amount`, `payment_status` |
+| Refused | `refusal_recorded` |
+| Can't contact | `last_contact_attempt_result` |
+| Rescheduled PTP | `PTP_date` (updated to new date) |
+| Task expired without action | `last_task_expired` |
+
+> After task closure, the system automatically re-enters the pipeline (→ Part 3).
+
+---
+
+### 2.3 Compliance Locks
+
+**Compliance-locked steps (🔒)** are mandated by HQ and cannot be modified by supervisors:
+- Cannot be removed from the template
+- Cannot be reordered past a defined boundary
+- Timing adjustable only within HQ-set limits
+- Outcome options visible but not modifiable
+
+---
+
+### 2.4 Supervisor Customization
+
+Supervisors fork a System Template into a Branch Variant and may adjust within the following rules:
 
 | Allowed | Not Allowed |
 |---------|-------------|
-| Reorder steps within an Objective (drag and drop) | Delete 🔒 locked steps |
-| Drag outcome transitions to different target steps | Edit System Templates directly |
-| Add optional steps | Remove audit trail / compliance logging |
-| Add/remove outcomes on non-locked steps | Modify outcome transitions on 🔒 locked steps |
-| Adjust timing (within HQ-set limits) | Reorder locked steps past their compliance boundary |
+| Reorder non-locked steps | Delete 🔒 locked steps |
+| Add optional steps | Edit System Templates directly |
+| Add/remove outcomes on non-locked steps | Modify outcome options on 🔒 locked steps |
+| Adjust timing (within HQ-set limits) | Reorder locked steps past compliance boundary |
 | Change assignee rules | Bypass publishing workflow |
-| Set retry limits on outcomes | Modify urgency-tier assignments |
-| Remove non-locked steps | |
-
-### 11. Compliance-Locked Steps
-
-Locked steps (🔒) are mandated by HQ for legal or operational compliance:
-- Cannot be removed from the playbook
-- Cannot be reordered past a defined boundary
-- Timing adjustable only within limits set by HQ
-- Outcome transitions visible but not modifiable by supervisors
-- Applies within an Objective's steps; Objective Chain ordering is system-managed, not supervisor-editable
+| Set retry limits on non-locked outcomes | Modify urgency-tier assignments |
 
 ---
 
-## Objective Chain Flow Diagram
+## Part 3 — Results
+
+What happens after a CO records an outcome.
+
+---
+
+### 3.1 Re-entry
+
+After a CO closes a task with an outcome:
+
+1. Contract attributes updated based on recorded outcome
+2. System re-enters the pipeline from the **gate** (Part 1.2)
+3. Gate re-evaluates:
+   - **Gate not met** → no new task → contract exits collection
+   - **Gate met** → rule chain re-evaluates
+4. Rule chain re-evaluates against updated attributes:
+   - Different rule matches → new task created for the new objective
+   - Same rule still matches → task re-created per timing params (retry within limit)
+   - No rule matches → default ติดตามหนี้ task created
+
+```
+CO closes task
+      │
+      ▼
+Contract attributes updated
+      │
+      ▼
+Re-enter pipeline ──→ Gate fails → No task · Contract exits collection
+      │
+   Gate passes
+      │
+      ▼
+Rule Chain evaluates
+      ├── Different rule matches → New objective task created
+      ├── Same rule matches     → Re-queue (retry)
+      └── No rule matches       → ติดตามหนี้ (default)
+```
+
+---
+
+### 3.2 End Conditions
+
+Collection ends when the gate condition is no longer met on re-entry.
+
+| Condition | How It Ends |
+|---|---|
+| ยอดที่ชำระ >= ยอดตามคาดการณ์ | Gate fails on re-entry → no new task → contract exits collection |
+| Restructure | TBD — closes gate condition |
+| Repossession | TBD — closes gate condition |
+
+---
+
+## Configuration & Governance
+
+---
+
+### Setting Governance
+
+This table is the **authoritative source** for role-based access across all Playbook Engine settings.
+
+| Setting Category | Add | Adjust | Change | Who |
+|-----------------|-----|--------|--------|-----|
+| Action types (name, properties) | ✅ | ✅ | ✅ | HQ only |
+| Outcomes per action type | ✅ | ✅ | ✅ | HQ only |
+| Required fields per outcome | ✅ | ✅ | ✅ | HQ only |
+| SLA defaults per action type | ✅ | ✅ | ✅ | HQ (global default); AM (per branch variant, within HQ limits) |
+| Retry limits per action type | ✅ | ✅ | ✅ | HQ (global default); AM (per branch variant, within HQ limits) |
+| Priority event mapping (event → P1–P4) | ✅ | ✅ | ✅ | HQ only |
+| Gate configurations (per portfolio type) | ✅ | ✅ | ✅ | HQ only |
+| Rule chain order and conditions | ❌ | ❌ | ❌ | HQ only — system-enforced |
+| Objective timing & action (values) | ✅ | ✅ | ✅ | HQ (global default); AM (within HQ limits) |
+| Compliance-locked steps | ✅ | ❌ | ❌ | HQ only — lock/unlock |
+| Playbook Engine structure (schema) | ❌ | ❌ | ❌ | System-defined — immutable |
+
+> **Branch variant scope**: AM adjustments apply to their branch variant only. HQ global default is unchanged. AM adjustments cannot exceed HQ-set limits.
+
+---
+
+### SLA Defaults by Action Type
+
+| Action Type | Default SLA | Adjustable By |
+|-------------|-------------|---------------|
+| 📞 Call | 4 hours | AM (per branch variant, within HQ limits) |
+| 🏠 Visit | 8 hours | AM (per branch variant, within HQ limits) |
+| 📋 Admin | 24 hours | AM (per branch variant, within HQ limits) |
+| ⏳ Wait | Duration defined in objective configuration | HQ only |
+
+---
+
+### Timing Parameters by Objective
+
+| Objective | DL | วันที่สร้างงาน (default) | อายุของงาน (default) | Retry (default) | AM-Adjustable |
+|-----------|----|-----------------------|---------------------|----------------|---------------|
+| เอาวันนัดชำระ | d (due date) | ก่อน due 7 วัน | 7 วัน | 3 ครั้ง | Timing ✅ |
+| แจ้งเตือนยืนยันนัดชำระ | PTP − 1 วัน | ก่อนวันนัดชำระ 1 วัน | ภายในวัน | 3 ครั้ง | Timing ✅ |
+| เก็บยอดตามนัดชำระ | PTP | วันนัดชำระ | ภายในวัน | 3 ครั้ง | Timing ✅ |
+| ติดตามเข้มงวด — รอบแรก | d + 3 | วันที่ list ขึ้น | 3 วัน | 1 ครั้ง | Timing ✅; Action ❌ (locked) |
+| ติดตามเข้มงวด — หลังได้ PTP | PTP + 1 | วันถัดจากวันนัดใหม่ | ภายในวัน | 1 ครั้ง | Timing ✅; Action ❌ (locked) |
+| ติดตามหนี้ (default) | d | วันที่ list ขึ้น | 3 วัน | 2 ครั้ง | Timing ✅ |
+
+---
+
+### Playbook Hierarchy
+
+| Level | Owner | Can Edit |
+|-------|-------|----------|
+| System Template | HQ | Gate conditions, rule chain, action types, timing, compliance locks |
+| Branch Variant | AM and above | Timing + action type within HQ-set limits; cannot change gate or rule conditions |
+
+System Templates are organized by `portfolio_type`. HQ manages which template applies to each portfolio type.
+
+---
+
+## Flow Diagram
 
 ```mermaid
 flowchart TD
-    EVENT[📥 Contract Event\nP1 / P2 / P3 / P4] --> URGENCY[Calculate\nthe_collection_urgency\nrisk_level or easiness_to_collect]
-    URGENCY --> TEMPLATE[Select Playbook Template\nportfolio_type × urgency_tier]
+    EVENT[📥 Contract Event\nor Re-entry after task closure] --> PRIORITY[Classify Priority\nP1–P4 · Work Queue grouping only]
+    PRIORITY --> GATE{"Gate: สัญญาที่ต้องติดตามหนี้?\nEligibility + portfolio classification\n(HQ-configurable per portfolio type)"}
 
-    TEMPLATE --> OBJ1[เอาวันนัดชำระ\n📞 7 days before due · 3 retries]
-    OBJ1 -->|success\nได้วันนัดชำระ| OBJ2[แจ้งเตือนยืนยันนัดชำระ\n📞 DL: PTP−1 · 3 retries]
-    OBJ1 -->|do not success / hard reject\nไม่ได้วันนัดชำระ / ปฏิเสธ| OBJ4[ติดตามเข้มงวด\n🏠 DL: d+3 · 1 retry]
-    OBJ1 -->|no action\nไม่ได้ทำ| ESC[🔒 ส่งเรื่องให้ผู้จัดการพื้นที่\nAM assign / legal action / find new address]
+    GATE -->|Not met| SUPPRESS[🚫 No task created\nContract exits collection if re-entry]
+    GATE -->|Met| RULECHAIN[Rule Chain Evaluator\nEvaluate rules 1–5 in order\nFirst match wins]
 
-    OBJ2 -->|สัญญาว่าจะชำระ| OBJ3[เก็บยอดตามนัดชำระ\n📞 DL: PTP · 3 retries]
-    OBJ2 -->|ปฏิเสธ / ติดต่อไม่ได้| OBJ4
-    OBJ2 -->|นัดวันใหม่| OBJ2
+    RULECHAIN -->|Rule 1| OBJ1[เอาวันนัดชำระ\n📞 No PTP set]
+    RULECHAIN -->|Rule 2| OBJ2[แจ้งเตือนยืนยันนัดชำระ\n📞 PTP_date − 1 = today]
+    RULECHAIN -->|Rule 3| OBJ3[เก็บยอดตามนัดชำระ\n📞 PTP_date = today]
+    RULECHAIN -->|Rule 4| OBJ4[ติดตามเข้มงวด\n🏠 Overdue or PTP broken]
+    RULECHAIN -->|Rule 5| OBJ5[ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒]
+    RULECHAIN -->|Default| DEFT[ติดตามหนี้\n📞 Softer follow-up]
 
-    OBJ3 -->|paid full\nชำระตามยอดคาดการณ์| END_S[✅ สิ้นสุดการตาม]
-    OBJ3 -->|do not get payment| OBJ4
+    OBJ1 & OBJ2 & OBJ3 & OBJ4 & DEFT --> CGATE{"Contact Gate\nCall/Visit only"}
+    CGATE -->|Passes| TASK[✅ Task CREATED\nCO works task · records outcome]
+    CGATE -->|Fails| SUPPRESS
 
-    OBJ4 -->|paid full\nชำระตามยอดคาดการณ์| END_S
-    OBJ4 -->|no\nไม่ได้ผล| OBJ4
-    OBJ4 -->|get PTP\nได้นัดชำระใหม่| OBJ3
+    TASK -->|Outcome recorded\nContract attributes updated| EVENT
 ```
 
 ---
@@ -303,9 +328,13 @@ flowchart TD
 
 | NFR | Requirement |
 |-----|-------------|
+| Gate configurability | Gate conditions must be configurable per portfolio type by HQ without engineering changes |
+| Re-entry atomicity | Re-entry evaluation and task creation after task closure must be atomic |
 | Compliance lock integrity | Locked steps cannot be removed or reordered by any user except HQ |
 | Version tracking | Branch variants must track which system template version they were forked from |
-| Instantiation atomicity | Playbook instantiation (creating all tasks for an Objective) must be atomic — all tasks created or none |
-| Urgency re-evaluation | `the_collection_urgency` is re-evaluated on each event; a contract's urgency tier can change between Objectives |
-| No duplicate chain | Only one active Objective Chain per contract at any time; duplicate event triggers must be deduplicated |
-| End condition idempotency | End Chain events (full payment, restructure, repossession) must close all active tasks for that contract atomically |
+| Instantiation atomicity | Task instantiation must be atomic — all tasks created or none |
+| Stateless evaluation | Rule chain reads only current contract attributes — no dependency on task history |
+| No duplicate active task | Only one active task per objective per contract at any time |
+| HQ-only enforcement | Settings marked "HQ only" must be restricted at system level |
+| AM boundary enforcement | AM adjustments validated against HQ-set limits at save time |
+| Reference stability | Existing instances referencing a setting must not break when the setting is updated |

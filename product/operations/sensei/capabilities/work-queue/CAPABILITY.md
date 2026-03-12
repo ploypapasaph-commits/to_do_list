@@ -27,6 +27,7 @@ Present field staff with a prioritized work queue organized by event priority (P
 |---------|--------|-------------|
 | Priority Buckets (P1–P4) | Draft | Queue organized into four priority tabs; each tab shows a contract table |
 | Contract Table View | Draft | Sortable table per priority bucket with all key contract fields |
+| Urgency Display | Draft | Surfaces `risk_level` (1–6) for Active portfolio contracts and `easiness_to_collect` (1–7) for Write-off contracts as the urgency value in the contract table; used for sort order within each priority bucket |
 | Customer Page Drill-Through | Draft | Clicking a contract row opens the customer page with collection log and notes |
 | One-by-One Processing Mode | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
 | Daily Contact Limit Enforcement | Draft | Auto-skip / flag contracts when customer's daily contact limit is reached |
@@ -82,6 +83,19 @@ Clicking any contract row opens the **customer page**, which contains:
 4. Record outcome from the action's defined outcome list
 5. Fill conditional fields required by outcome (e.g., PTP → amount + date)
 6. Save and return to the queue table; completed task removed from the bucket
+
+### Urgency Scoring
+
+The `Urgency` column in the contract table is sourced directly from the contract record — no calculation performed by Work Queue.
+
+| Portfolio | Field | Scale |
+|-----------|-------|-------|
+| Active | `risk_level` | 1–6 (higher = more urgent) |
+| Write-off | `easiness_to_collect` | 1–7 (higher = easier to collect) |
+
+This value drives sort order within each priority bucket (see Default sort order above) and is visible to COs as a triage signal.
+
+---
 
 ### Daily Contact Limit Rules
 

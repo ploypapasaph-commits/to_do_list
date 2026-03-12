@@ -27,13 +27,12 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 ## Product Boundary
 
 **This product IS responsible for:**
-- Playbook Engine: HQ System Templates → Branch Variant model, compliance-locked steps, outcome-based transition routing, template version sync
+- Playbook Engine: gate evaluation, rule chain (objective selection), action types, timing parameters, compliance-locked steps, HQ System Templates → Branch Variant model, template version sync
 - Task Engine: unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED), event-driven task generation from DaVinci/Core Banking/Policy Admin, external task creation contract (TaskCreationRequest), task completion feedback (TaskCompleted)
-- Work Queue: grouped action buckets (Calls/Visits/Admin/External), priority sub-groups, one-by-one primary processing mode, rapid-fire extended mode
+- Work Queue: P1–P4 priority buckets, contract table with urgency display (`risk_level` / `easiness_to_collect`), one-by-one processing mode
 - Performance & Visibility Dashboard: supervisor team workload + exception alerts; staff self-service metrics + gamified leaderboard
 - Contact compliance **enforcement**: Task Engine queries BOS collection note log at task generation time (if daily limit reached → task suppressed); subscribes to ContactWindowClosed event for business hours enforcement; publishes ContactRecorded to DaVinci on every Call/Visit closure
 - Action verification: cross-reference recorded Call outcomes against BOS collection note log (trust-but-verify; does not block CO workflow); verification status and mismatches surfaced in Performance Dashboard
-- Template Library: single source of truth for all configurable playbook settings with role-based governance (HQ / AM per setting); covers action types, outcomes, required fields, SLA defaults, retry limits, urgency tier mappings, priority event mappings (P1–P4), objective timing configurations, talking points, and compliance-lock definitions
 - AM Worklist: area manager operational queue for escalated and manually-added contracts; AM assign / legal action / find new address actions
 
 **This product IS NOT responsible for:**
@@ -45,7 +44,7 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 
 **This product RECEIVES from:**
 - DaVinci → ContactWindowClosed event (business hours enforcement) → via event subscription
-- DaVinci → risk_level (active portfolio) and easiness_to_collect (write-off portfolio) scores per contract → used for urgency tier classification (Sensei owns the mapping rules, not the raw scores)
+- DaVinci → `risk_level` (active portfolio) and `easiness_to_collect` (write-off portfolio) per contract → displayed as urgency in Work Queue for sort and triage
 - DaVinci → customer.resolution_required events (creates Admin tasks for COs) → via event subscription
 - Onigiri → TaskCreationRequest events when loan workflow needs branch action → via event
 - Matcha → TaskCreationRequest events when doc verification needs branch action → via event
@@ -63,8 +62,7 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 
 | Capability | Owner | Status | Stage | Description |
 |-----------|-------|--------|-------|-------------|
-| [Template Library](capabilities/template-library/CAPABILITY.md) | Product | Draft | 1 — HQ Configuration | Single source of truth for all configurable playbook settings with role-based governance (HQ / AM). Covers: action types + outcomes + required fields, SLA defaults, retry limits, urgency tier mappings, priority event mappings (P1–P4), objective timing configurations, talking points, and compliance-lock definitions. Playbook Engine consumes these settings; Template Library governs them. |
-| [Playbook Engine](capabilities/playbook-engine/CAPABILITY.md) | Product | Draft | 1 — HQ Configuration · 2 — Event Ingestion · 4 — Outcome Routing | Assembles and executes collection strategies using settings governed by Template Library. Owns: Objective Chain structure, outcome routing between Objectives, Branch Variant fork model, compliance-locked steps (🔒), template version sync. Sequencing and routing logic lives here — all configurable parameters (timing, SLAs, retry counts, urgency mappings) are defined and governed in Template Library. |
+| [Playbook Engine](capabilities/playbook-engine/CAPABILITY.md) | Product | Draft | 1 — HQ Configuration · 2 — Event Ingestion | Single source of truth for collection task configuration and evaluation logic. Gate evaluation, rule chain (objective selection), action types, SLA defaults, timing parameters, compliance-locked steps, HQ System Templates, Branch Variant fork model, setting governance. Re-evaluates after every task closure — no hardcoded transition routing. |
 | [Task Engine](capabilities/task-engine/CAPABILITY.md) | Engineering | Draft | 2 — Event Ingestion · 3 — CO Execution | Unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED + OVERDUE + ESCALATED). 3 task sources: playbook_step, manual, external. Contact limit pre-check + ContactWindowClosed enforcement. ContactRecorded feedback to DaVinci. TaskCompleted feedback events. |
 | [Work Queue](capabilities/work-queue/CAPABILITY.md) | Engineering | Draft | 3 — CO Execution | Grouped action buckets (Calls/Visits/Admin). Priority sub-groups (Overdue > High DPD > Normal). One-by-one primary mode. Rapid-fire extended mode. Daily contact limit enforcement. |
 | [Performance Dashboard](capabilities/performance-dashboard/CAPABILITY.md) | Product | Draft | 5 — Management Oversight | Supervisor view: team workload table, active playbooks, exception panel (5 alert types), daily scorecard, contact compliance status. Staff view: personal metrics, monthly objectives, branch rank, gamified leaderboard, supervisor feedback. |
@@ -72,46 +70,53 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 
 ---
 
-## Capability Map
+
+## Task Generation Pipeline
+
+How a task moves from trigger to `CREATED` state — covering all three source paths, deduplication, template selection, and contact gate enforcement.
 
 ```mermaid
 flowchart TD
-    subgraph STAGE1["📋 Stage 1 — HQ Configuration (One-time Setup)"]
-        TL["📚 Template Library\nDefines action types · outcomes · SLAs · escalation rules"]
-        PE_CONFIG["🎯 Playbook Engine\nHQ builds System Templates per portfolio × urgency tier\nDefines Objective Chain + Outcome Routing"]
-        TL --> PE_CONFIG
+    subgraph SOURCES["Task Sources"]
+        EV(["📡 Contract Event\nDaVinci / Core Banking / Policy Admin"])
+        EXT(["📨 TaskCreationRequest\nOnigiri · Matcha"])
+        MAN(["👤 Manual Task\nSupervisor UI"])
     end
 
-    subgraph STAGE2["📥 Stage 2 — Event Ingestion (Automated)"]
-        EVENT(["Contract Event\nDaVinci / Core Banking / Onigiri / Matcha"])
-        PE_CLASSIFY["🎯 Playbook Engine\nClassifies → P1–P4 Priority\nCalculates urgency · Determines active Objective"]
-        TE_CREATE["⚙️ Task Engine\nCreates task · Auto-assigns to CO\nCREATED → ASSIGNED"]
-        EVENT --> PE_CLASSIFY
-        PE_CLASSIFY --> TE_CREATE
+    subgraph PLAYBOOK_PATH["Playbook Path (source = playbook_step)"]
+        PP1["① Priority Assignment\nP1–P4 · Work Queue grouping only"]
+        PP2{"② Dedup\nActive task exists\nfor this contract?"}
+        PP3["③ Template Selection\nby portfolio_type"]
+        PP4["④ Rule Chain Evaluation\nGate check → rules 1–5 in order → first match → Objective"]
     end
 
-    subgraph STAGE3["👤 Stage 3 — CO Daily Execution"]
-        WQ["📋 Work Queue\nCO sees tasks in P1–P4 priority buckets\nOpens customer page · Records outcome"]
-        TE_CLOSE["⚙️ Task Engine\nTask → ACTIVE → CLOSED\nContact limit check · ContactRecorded feedback"]
-        WQ --> TE_CLOSE
+    subgraph EXT_PATH["External Path (source = external)"]
+        EP1["① Validate fields\naction_type · customer_id\nsource_system · source_ref_id"]
+        EP2{"② Dedup\nSame source_system\n+ source_ref_id?"}
     end
 
-    subgraph STAGE4["🔄 Stage 4 — Outcome Routing (Automated)"]
-        PE_ROUTE["🎯 Playbook Engine\nRoutes to next Objective in chain\nor escalates contract to AM"]
+    subgraph GATE["Contact Gates — Call / Visit only"]
+        G1{"Daily contact\nlimit reached?\n(BOS log check)"}
+        G2{"Contact window\nclosed?\n(DaVinci event)"}
     end
 
-    subgraph STAGE5["👔 Stage 5 — Management Oversight"]
-        PD["📊 Performance Dashboard\nSupervisor monitors team workload\nException alerts · Leaderboard · DPD movement"]
-        AW["📁 AM Worklist\nAM acts on escalated contracts\nAssign · Legal action · Find new address"]
-    end
+    TASK(["✅ CREATED\n→ Task Lifecycle begins"])
+    SUP(["🚫 Suppressed / Rejected"])
 
-    STAGE1 -.->|templates ready| STAGE2
-    TE_CREATE --> WQ
-    TE_CLOSE --> PE_ROUTE
-    PE_ROUTE -->|next Objective| TE_CREATE
-    PE_ROUTE -->|no-action escalation| AW
-    TE_CLOSE -.->|real-time data| PD
-    PD --> AW
+    EV --> PP1 --> PP2
+    PP2 -->|"Yes — suppress"| SUP
+    PP2 -->|"No"| PP3 --> PP4 --> G1
+
+    EXT --> EP1 --> EP2
+    EP2 -->|"Yes — suppress"| SUP
+    EP2 -->|"No"| G1
+
+    MAN -->|"Admin/manual\ngate exempt"| TASK
+
+    G1 -->|"Yes → suppress\nsurface in supervisor\nexception panel"| SUP
+    G1 -->|"No"| G2
+    G2 -->|"Yes → not created\nCO sees contact\nwindow closed"| SUP
+    G2 -->|"No"| TASK
 ```
 
 ---
@@ -130,6 +135,104 @@ stateDiagram-v2
     OVERDUE --> ASSIGNED: Supervisor intervenes
     CLOSED --> [*]: TaskCompleted event published
 ```
+
+---
+
+## Task Creation Reference
+
+Every task in Sensei is classified by a **Work Domain** — the primary field that determines which playbook template, priority event mapping, and queue tab applies. HQ can add new work domains and sub-types by registering them in Playbook Engine (event mapping + System Templates) with no engineering changes required.
+
+### Work Domain Overview
+
+| Work Domain | Sub-type | Entry Criteria | Event Source | Urgency Dimension | Work Queue Tab |
+|-------------|----------|----------------|-------------|-------------------|----------------|
+| Collection | Active | `contract.status = active` AND delinquency/pre-due state reached | Core Banking → DaVinci | `risk_level` (1–6); higher = higher risk | Collection |
+| Collection | Write-off | `contract.status = write_off` | Core Banking → DaVinci | `easiness_to_collect` (1–7); higher = easier to recover | Collection |
+| Collection | Litigation | `contract.status = litigation` | Legal system → DaVinci | TBD | Collection |
+| Sales | Insurance Renewal | `insurance.status = active` AND `expiry_date` within renewal window | Policy Admin → DaVinci | Days to expiry; fewer days = higher urgency | Sales |
+| Offerings | Top-up | Customer meets Core Banking top-up eligibility criteria | Core Banking → DaVinci | TBD (campaign priority) | Offerings |
+| Offerings | Nano | Customer meets Core Banking nano eligibility criteria | Core Banking → DaVinci | TBD (campaign priority) | Offerings |
+| Offerings | Insurance | Customer meets insurance product eligibility criteria | Policy Admin → DaVinci | TBD (campaign priority) | Offerings |
+
+---
+
+### Two Key Dimensions: Priority vs. Urgency
+
+These are independent — do not conflate them.
+
+| Dimension | Determined By | Configured By | Drives |
+|-----------|--------------|--------------|--------|
+| **Priority (P1–P4)** | Which event fired + trigger condition | HQ in Playbook Engine → Priority Event Mapping per work domain | Which Work Queue **group** the contract appears in — grouping only; does not determine which Objective is activated |
+| **Urgency Score** | Contract-level score (`risk_level`, `easiness_to_collect`, days-to-expiry) | Sourced from contract record — no HQ mapping | Sort order **within** a priority bucket; triage signal for COs |
+
+P1–P4 determines Work Queue grouping only. Objective selection is handled by the Rule Chain Evaluator based on contract attributes at evaluation time. Urgency score affects which contracts are worked first within the same group — not which group they land in.
+
+---
+
+### Common Gates — Contact Tasks Only (All Work Domains)
+
+Every Call or Visit task passes through these gates before being created, regardless of domain, sub-type, or source. Admin and manual tasks are exempt.
+
+| Gate | Data Source | Passes → | Fails → |
+|------|------------|----------|---------|
+| Contact limit | BOS collection note log | Task created normally | Task **suppressed**; contract flagged in supervisor exception panel |
+| Contact window | DaVinci `ContactWindowClosed` event | Task created normally | Task **not created**; CO sees "Contact window closed" |
+
+---
+
+### External Tasks — Cross-Domain (source = external)
+
+Triggered by Onigiri or Matcha publishing a `TaskCreationRequest` event. Applies across any work domain.
+
+| Validation | Condition | Reject if |
+|-----------|-----------|-----------|
+| `action_type` | Must exist in Playbook Engine → Action Type Registry | Unknown type |
+| `customer_id` | Must be a valid DaVinci customer ID | Invalid |
+| `source_system` | Must be declared (e.g., "onigiri", "matcha") | Missing |
+| `source_ref_id` | Must be present | Missing |
+
+**Deduplication**: Duplicate request with same `source_system + source_ref_id` → suppressed (idempotent).
+**Contact gate**: Applied if `action_type` = Call or Visit.
+
+---
+
+### Manual Tasks — Cross-Domain (source = manual)
+
+Triggered by Supervisor creating a one-off task in the UI. Applies across any work domain.
+
+| Validation | Condition |
+|-----------|-----------|
+| `action_type` | Must be valid per Playbook Engine → Action Type Registry |
+| CO | Must be assigned |
+
+**Contact gate**: Not applied — manual and Admin tasks are exempt.
+
+---
+
+### Suppression & Soft-Stop Cases
+
+| Scenario | Applies To | Result | Surfaced In |
+|----------|-----------|--------|-------------|
+| Contact daily limit reached | All domains — Call/Visit tasks | Task suppressed | Supervisor exception panel |
+| Contact window closed (outside business hours) | All domains — Call/Visit tasks | Task not created | CO sees "Contact window closed" |
+| Active task already exists for this contract | Playbook-driven tasks | Event suppressed; no duplicate task | Silent deduplication |
+| Duplicate TaskCreationRequest (same source_system + source_ref_id) | External tasks | Request suppressed | Silent; idempotent |
+| Required validation fields missing | External tasks | Request rejected | Source system notified |
+| Outcome = decline / not interested | Sales, Offerings domains | **Soft-stop**: new tasks suppressed for N months (HQ-configurable) | No exception panel — expected outcome |
+
+---
+
+### Work Queue Tab Structure
+
+Each work domain feeds a **separate top-level tab** in the Work Queue. Within each tab, contracts are grouped by P1–P4 sub-buckets and sorted by urgency score within each bucket.
+
+| Tab | Work Domains |
+|-----|-------------|
+| Collection | Active, Write-off, Litigation |
+| Sales | Insurance Renewal |
+| Offerings | Top-up, Nano, Insurance |
+
+> Full Work Queue tab design is specified in [Work Queue CAPABILITY.md](capabilities/work-queue/CAPABILITY.md).
 
 ---
 
