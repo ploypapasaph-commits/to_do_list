@@ -4,7 +4,7 @@
 **Portfolio**: Operations
 **Product Owner**: TBD (Operations PO)
 **Status**: 📝 Draft — @FEATURE decomposition pending
-**Last Updated**: 2026-03-12
+**Last Updated**: 2026-03-13
 
 ---
 
@@ -52,12 +52,14 @@ Gate configurations are **HQ-managed per portfolio type** and stored in the Play
 
 Each registered portfolio type carries three things: its gate conditions, its rule chain, and its System Template. The gate identifies the portfolio type — everything that follows (rule chain evaluation, task instantiation) is scoped to that type.
 
-| Portfolio Type | Gate Conditions | Rule Chain |
+| Portfolio Type | Gate Conditions (all must be met) | Rule Chain |
 |---|---|---|
-| Collection: Active | ยอดที่ชำระ < ยอดตามคาดการณ์ AND due_date อยู่ในช่วง −7 ถึง +30 วันจากวันนี้ | Collection: Active (→ 1.2.1) |
-| Collection: Write-off | contract.status = write_off AND ยอดค้างชำระ > 0 | Collection: Write-off (→ 1.2.2) |
+| Collection: Active | (1) ยอดที่ชำระ < ยอดตามคาดการณ์ — (2) ประเภทสัญญา = Active — (3) NOT (PTP_date exists AND PTP_date > today + 1) | Collection: Active (→ 1.2.1) |
+| Collection: Write-off | (1) ยอดที่ชำระ < ยอดเงินเป้า incentive tier 1 — (2) ประเภทสัญญา = Write-off | Collection: Write-off (→ 1.2.2) |
 
 > HQ adds new portfolio types by registering gate conditions + a rule chain together. The gate is not hardcoded to collection — it is a configurable construct. When a contract is fully paid, the gate naturally fails on re-entry and no further tasks are created — no explicit "end chain" command needed.
+
+> **PTP suppress (condition 3)**: A contract with a valid future PTP appointment (PTP_date > today + 1) is suppressed — no task is created while the customer is waiting to pay. The system schedules a re-evaluation at PTP_date − 1, at which point the gate passes and Rule 2 (แจ้งเตือนยืนยันนัดชำระ) fires. This re-evaluation is schedule-triggered, not task-closure-triggered, since no task was created to close.
 
 ---
 
@@ -67,29 +69,83 @@ Each portfolio type registered in the gate has its **own rule chain**, defined b
 
 #### 1.2.1 Collection: Active
 
-| # | Objective | Conditions | Adjustable By |
-|---|---|---|---|
-| 1 | เอาวันนัดชำระ | No PTP set (`PTP_date` is null) | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | PTP exists AND `PTP_date − 1 day = today` | HQ only |
-| 3 | เก็บยอดตามนัดชำระ | PTP exists AND `PTP_date = today` AND no payment recorded | HQ only |
-| 4 | ติดตามเข้มงวด | `due_date` passed with no PTP OR PTP broken (`PTP_date < today`, no payment) | HQ only |
-| 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ | TBD | HQ only 🔒 |
-| Default | ติดตามหนี้ | No rule above matched | HQ only |
+All conditions within the same rule number are **AND**. Rules 6–9 are each single-condition escalation triggers (OR relationship — whichever fires first escalates).
+
+> Contact counts (`การติดต่อ X`) are tracked **per objective type** — not total contacts. Each objective has its own counter, reset per installment cycle.
+
+| # | Objective | Factor | Condition | Adjustable By |
+|---|---|---|---|---|
+| 1 | เอาวันนัดชำระ | วันครบกำหนดชำระ | วันครบกำหนดชำระ ภายใน 7 วัน | HQ only |
+| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน | HQ only |
+| 1 | เอาวันนัดชำระ | การติดต่อเอาวันนัดชำระ | ≤ 3 ครั้งในงวดนี้ | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | พฤติกรรมลูกค้า | ≠ ผิดนัดชำระบ่อย / ผิดนัดชำระบางครั้ง | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 3 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน | HQ only |
+| 3 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 4 | เก็บยอดตามนัดชำระ | วันนัดชำระ | = วันนี้ | HQ only |
+| 4 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 5 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) | HQ only |
+| 5 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเอาวันนัดชำระ | > 3 ครั้งในงวดนี้ | HQ only |
+| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
+| 8 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
+| 9 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ | HQ only |
+| Default | ติดตามหนี้ | — | Gate passes AND no rule above matched | HQ only |
 
 **Worked examples:**
 
-| Contract Attributes | Objective Activated |
-|---|---|
-| No PTP set | เอาวันนัดชำระ (Rule 1) |
-| PTP exists, PTP_date − 1 = today | แจ้งเตือนยืนยันนัดชำระ (Rule 2) |
-| PTP exists, PTP_date = today, no payment | เก็บยอดตามนัดชำระ (Rule 3) |
-| due_date passed with no PTP | ติดตามเข้มงวด (Rule 4) |
-| PTP broken (PTP_date < today, no payment) | ติดตามเข้มงวด (Rule 4) |
-| Passes gate, no rule matched | ติดตามหนี้ (Default) |
+| Contract State | Rule Fired | Objective |
+|---|---|---|
+| Active, no PTP, due within 7 days, contact 0–3 | Rule 1 | เอาวันนัดชำระ |
+| Has PTP, PTP tomorrow, good behavior, contact 0 | Rule 2 | แจ้งเตือนยืนยันนัดชำระ |
+| Has PTP, PTP tomorrow, frequent defaulter, contact 0 | Rule 3 | แจ้งเตือนยืนยันนัดชำระ |
+| PTP date = today, contact 0 | Rule 4 | เก็บยอดตามนัดชำระ |
+| No PTP, overdue, ลงพื้นที่ contact 0 | Rule 5 | ลงพื้นที่ |
+| Broken PTP (PTP_date < today, no payment), ลงพื้นที่ contact 0 | Rule 5 | ลงพื้นที่ |
+| เอาวันนัดชำระ contacted 4+ times | Rule 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| แจ้งเตือนฯ contacted 2+ times | Rule 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| เก็บยอดฯ contacted 2+ times | Rule 8 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| ลงพื้นที่ contacted 2+ times | Rule 9 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| Gate passes, no rule matched | Default | ติดตามหนี้ |
+| Has PTP, PTP_date > today + 1 | Gate suppressed | No task — scheduled re-evaluation at PTP_date − 1 |
 
 #### 1.2.2 Collection: Write-off
 
-> Rule chain TBD — objectives and conditions to be defined with stakeholders.
+All conditions within the same rule number are **AND**. Rules 5–7 are each single-condition escalation triggers (OR relationship — whichever fires first escalates).
+
+> Contact counts (`การติดต่อ X`) are tracked **per objective type** — not total contacts. Each objective has its own counter, reset per installment cycle.
+
+> **Rule 1 cooldown**: Unlike Collection: Active (which caps by count), Write-off uses a 5-day cooldown between contact attempts. Rule 1 fires as long as no PTP is set and the last contact was > 5 days ago (or never contacted). This produces a contact rhythm of every 6 days (5-day gap + day of contact).
+
+| # | Objective | Factor | Condition | Adjustable By |
+|---|---|---|---|---|
+| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน | HQ only |
+| 1 | เอาวันนัดชำระ | การติดต่อ | ยังไม่ได้ติดต่อใน 5 วัน | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ ภายใน 1 วัน | HQ only |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 3 | เก็บยอดตามนัดชำระ | วันนัดชำระ | วันนัดชำระ = วันนี้ | HQ only |
+| 3 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดตามนัดชำระ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 4 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) | HQ only |
+| 4 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ | HQ only |
+| 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
+| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
+| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ | HQ only |
+| Default | ติดตามหนี้ | — | Gate passes AND no rule matched | HQ only |
+
+**Worked examples:**
+
+| Contract State | Rule Fired | Objective |
+|---|---|---|
+| Write-off, no PTP, last contact > 5 days ago | Rule 1 | เอาวันนัดชำระ |
+| Write-off, no PTP, contacted within last 5 days | No match → Default | ติดตามหนี้ |
+| Has PTP, PTP tomorrow, contact 0 | Rule 2 | แจ้งเตือนยืนยันนัดชำระ |
+| PTP date = today, contact 0 | Rule 3 | เก็บยอดตามนัดชำระ |
+| No PTP and overdue, ลงพื้นที่ contact 0 | Rule 4 | ลงพื้นที่ |
+| Broken PTP (PTP_date < today, no payment), ลงพื้นที่ contact 0 | Rule 4 | ลงพื้นที่ |
+| แจ้งเตือนฯ contacted 2+ times | Rule 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| เก็บยอดฯ contacted 2+ times | Rule 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
+| ลงพื้นที่ contacted 2+ times | Rule 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ |
 
 ---
 
@@ -291,24 +347,32 @@ System Templates are organized by `portfolio_type`. HQ manages which template ap
 
 ```mermaid
 flowchart TD
-    EVENT[📥 Contract Event\nor Re-entry after task closure] --> GATE{"Gate\nEligibility check +\nPortfolio classification\n(HQ-configurable per portfolio type)"}
+    EVENT[📥 Contract Event\nor Re-entry after task closure] --> GATE{"Gate\n(1) ยอดที่ชำระ < ยอดตามคาดการณ์\n(2) ประเภทสัญญา = Active\n(3) NOT future PTP > today+1"}
 
-    GATE -->|Not met| SUPPRESS[🚫 No task created\nContract exits pipeline if re-entry]
-    GATE -->|"Collection: Write-off"| CHAIN_B[Rule Chain: Collection Write-off\nTBD]
+    GATE -->|Not met / PTP suppressed| SUPPRESS[🚫 No task\nIf PTP suppress → schedule re-eval at PTP_date−1]
+    GATE -->|"Collection: Write-off"| CHAIN_B["Rule Chain: Collection Write-off\nR1: เอาวันนัดชำระ (no PTP + 5-day cooldown)\nR2: แจ้งเตือนฯ (PTP within 1d + contact ≤1)\nR3: เก็บยอดฯ (PTP_date = today)\nR4: ลงพื้นที่ (overdue or broken PTP)\nR5–7: ส่งเรื่องฯ (escalation)\nDefault: ติดตามหนี้"]
 
-    GATE -->|"Collection: Active"| R1{"Rule 1\nNo PTP set?"}
+    GATE -->|"Collection: Active"| R1{"Rule 1\nDue ≤7d AND no PTP AND contact ≤3?"}
     R1 -->|Match| OBJ1[เอาวันนัดชำระ 📞]
-    R1 -->|No match| R2{"Rule 2\nPTP_date − 1 = today?"}
+    R1 -->|No match| R2{"Rule 2\nPTP within 1d AND good behavior AND contact ≤1?"}
     R2 -->|Match| OBJ2[แจ้งเตือนยืนยันนัดชำระ 📞]
-    R2 -->|No match| R3{"Rule 3\nPTP_date = today, no payment?"}
-    R3 -->|Match| OBJ3[เก็บยอดตามนัดชำระ 📞]
-    R3 -->|No match| R4{"Rule 4\nOverdue or PTP broken?"}
-    R4 -->|Match| OBJ4[ติดตามเข้มงวด 🏠]
-    R4 -->|No match| R5{"Rule 5\nTBD?"}
-    R5 -->|Match| OBJ5[ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒]
-    R5 -->|No match| DEFT[ติดตามหนี้ 📞\nDefault]
+    R2 -->|No match| R3{"Rule 3\nPTP within 1d AND contact ≤1?"}
+    R3 -->|Match| OBJ3[แจ้งเตือนยืนยันนัดชำระ 📞]
+    R3 -->|No match| R4{"Rule 4\nPTP_date = today AND contact ≤1?"}
+    R4 -->|Match| OBJ4[เก็บยอดตามนัดชำระ 📞]
+    R4 -->|No match| R5{"Rule 5\nOverdue no PTP OR broken PTP\nAND ลงพื้นที่ contact ≤1?"}
+    R5 -->|Match| OBJ5[ลงพื้นที่ 🏠]
+    R5 -->|No match| R6{"Rule 6\nเอาวันนัดชำระ contact >3?"}
+    R6 -->|Match| ESC[ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒]
+    R6 -->|No match| R7{"Rule 7\nแจ้งเตือนฯ contact >1?"}
+    R7 -->|Match| ESC
+    R7 -->|No match| R8{"Rule 8\nเก็บยอดฯ contact >1?"}
+    R8 -->|Match| ESC
+    R8 -->|No match| R9{"Rule 9\nลงพื้นที่ contact >1?"}
+    R9 -->|Match| ESC
+    R9 -->|No match| DEFT[ติดตามหนี้ 📞\nDefault]
 
-    OBJ1 & OBJ2 & OBJ3 & OBJ4 & DEFT --> CGATE{"Contact Gate\nCall/Visit only"}
+    OBJ1 & OBJ2 & OBJ3 & OBJ4 & OBJ5 & DEFT --> CGATE{"Contact Gate\nCall/Visit only"}
     CGATE -->|Passes| TASK[✅ Task CREATED\nCO works task · records outcome]
     CGATE -->|Fails| SUPPRESS
 
