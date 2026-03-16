@@ -66,10 +66,10 @@ Shown in both daily and monthly views. Daily shows actual vs. plan; monthly show
 
 | Metric | Unit | Target | Direction | Note |
 |--------|------|--------|-----------|------|
-| Net Booking เทียบเป้า | บาท | เราเอง (branch own target) | — | |
-| ประกันรวม เทียบเป้า | บาท | เราเอง (branch own target) | — | |
-| ลูกค้าใหม่ เทียบเป้า | คน | tier 1 | — | |
-| %การทำ Top Up Nano | % | 40% | ยิ่งมากยิ่งดี | ดูเป็นรายคน — ทำ ≥ 1 รายการ/คน นับว่าทำ |
+| Net Booking เทียบเป้า | บาท | HQ | — | |
+| ประกันรวม เทียบเป้า | บาท | HQ | — | |
+| ลูกค้าใหม่ เทียบเป้า | คน | tier 1 incentive | — | |
+| %การทำ Top Up Nano | % | 40% of eligible list | ยิ่งมากยิ่งดี | ดูเป็นรายคน — ทำ ≥ 1 รายการ/คน นับว่าทำ |
 
 **ยอดสินเชื่อ breakdown** (แสดงแยก On Top / Top Up / ลูกค้าใหม่):
 - Daily: ยอดที่ทำได้ (บาท) / จำนวน (สัญญา/คน)
