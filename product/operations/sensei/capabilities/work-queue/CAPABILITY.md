@@ -30,8 +30,7 @@ Present field staff with a prioritized work queue organized by event priority (P
 | Urgency Display | Draft | Surfaces `risk_level` (1–6) for Active portfolio contracts and `easiness_to_collect` (1–7) for Write-off contracts as the urgency value in the contract table; used for sort order within each priority bucket |
 | Customer Page Drill-Through | Draft | Clicking a contract row opens the customer page with collection log and notes |
 | One-by-One Processing Mode | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
-| Daily Contact Limit Enforcement | Draft | Auto-skip / flag contracts when customer's daily contact limit is reached |
-| Queue Overview Header | Draft | Top-level summary: total contracts today, completed, overdue, contact-blocked |
+| Queue Overview Header | Draft | Top-level summary: total contracts today, completed, overdue |
 
 ---
 
@@ -107,20 +106,10 @@ This value drives sort order within each priority bucket (see Default sort order
 
 ---
 
-### Daily Contact Limit Rules
-
-- Maximum contacts per customer per day: configurable (default: 2)
-- System enforces limit — task is flagged / auto-skipped if limit reached
-- Visual indicator on the contract row: "⚠️ Contact limit reached"
-- DaVinci owns contact count data and emits `ContactLimitReached` event; Sensei enforces the skip
-
----
-
 ## NFRs
 
 | NFR | Requirement |
 |-----|-------------|
 | Target throughput | Queue UX must support 300–500 task completions per CO per day |
-| Contact limit enforcement | System must not allow CO to initiate contact when limit reached |
 | Pre-loaded context | Customer page and collection log must load without additional navigation steps |
 | Table performance | Contract table must render within 2 seconds for up to 500 rows per bucket |
