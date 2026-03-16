@@ -18,7 +18,7 @@ Branch field staff work across multiple products and systems (Onigiri for loans,
 
 ## Value Proposition
 
-A centralized branch worklist and task orchestration platform. Aggregates all branch work — from Sensei's own playbook-driven tasks, to external service requests (Onigiri, Matcha), to supervisor-created manual tasks — into a single prioritized queue with SLA tracking, gamified performance dashboards, contact compliance enforcement, and action verification.
+A centralized branch worklist and task orchestration platform. Aggregates all branch work — from Sensei's own playbook-driven tasks, to external service requests (Onigiri, Matcha), to supervisor-created manual tasks — into a single prioritized queue with SLA tracking, performance dashboards, and contact compliance enforcement.
 
 **For whom**: Branch Credit Officers (COs) who execute daily work; Branch Supervisors who manage team performance and compliance; HQ who defines collection playbooks and compliance-locked strategies.
 
@@ -29,11 +29,9 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 **This product IS responsible for:**
 - Playbook Engine: gate evaluation, rule chain (objective selection), action types, timing parameters, compliance-locked steps, HQ System Templates → Branch Variant model, template version sync
 - Task Engine: unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED), event-driven task generation from DaVinci/Core Banking/Policy Admin, external task creation contract (TaskCreationRequest), task completion feedback (TaskCompleted)
-- Work Queue: P1–P4 priority buckets, contract table with urgency display (`risk_level` / `easiness_to_collect`), one-by-one processing mode
-- Performance & Visibility Dashboard: supervisor team workload + exception alerts; staff self-service metrics + gamified leaderboard
+- Work Queue: role-scoped queue for all levels — Branch: P1–P4 priority buckets (Collection / Sales / Offerings tabs), urgency display, one-by-one processing; AM+: สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ execution queue with AM assign / legal action / find new address
+- Performance Dashboard: Home Dashboard + Performance Summary for all levels (role-scoped); AM+: Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา) for oversight and manual pull into Work Queue
 - Contact compliance **enforcement**: Task Engine queries BOS collection note log at task generation time (if daily limit reached → task suppressed); subscribes to ContactWindowClosed event for business hours enforcement; publishes ContactRecorded to DaVinci on every Call/Visit closure
-- Action verification: cross-reference recorded Call outcomes against BOS collection note log (trust-but-verify; does not block CO workflow); verification status and mismatches surfaced in Performance Dashboard
-- AM execution queue (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่): auto-escalated and manually-added contracts in Work Queue (AM view); AM assign / legal action / find new address actions
 
 **This product IS NOT responsible for:**
 - Contact compliance **data ownership** — contact log, frequency limits, cross-product aggregation (owned by **DaVinci**)

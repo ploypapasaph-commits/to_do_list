@@ -25,8 +25,10 @@ Present all levels with a role-scoped work queue. Branch staff see a prioritized
 
 | Feature | Level | Status | Description |
 |---------|-------|--------|-------------|
-| Priority Buckets (P1–P4) | Branch | Draft | Queue organized into four priority tabs; each tab shows a contract table |
-| Contract Table View | Branch | Draft | Sortable table per priority bucket with all key contract fields |
+| Collection Tab | Branch | Draft | P1–P4 priority queue for Active, Write-off, and Litigation contracts |
+| Sales Tab | Branch | Draft | Insurance Renewal contracts — sorted by days to expiry |
+| Offerings Tab | Branch | Draft | Top-up, Nano, and Insurance eligibility contracts — sorted by campaign priority |
+| Contract Table View | Branch | Draft | Sortable table per tab/bucket with all key contract fields |
 | Urgency Display | Branch | Draft | Surfaces `risk_level` (1–6) for Active portfolio contracts and `easiness_to_collect` (1–7) for Write-off contracts as the urgency value in the contract table; used for sort order within each priority bucket |
 | Customer Page Drill-Through | Branch + AM+ | Draft | Clicking a contract row opens the customer page with collection log and notes |
 | One-by-One Processing Mode | Branch | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
@@ -104,6 +106,32 @@ The `Urgency` column in the contract table is sourced directly from the contract
 | Write-off | `easiness_to_collect` | 1–7 (higher = easier to collect) |
 
 This value drives sort order within each priority bucket (see Default sort order above) and is visible to COs as a triage signal.
+
+---
+
+## Branch Queue: Sales Tab
+
+Contains Insurance Renewal contracts. Separate top-level tab from Collection.
+
+| Work Domain | Sub-type | Entry Condition | Urgency |
+|-------------|----------|----------------|---------|
+| Sales | Insurance Renewal | `insurance.status = active` AND `expiry_date` within renewal window | Days to expiry (fewer = higher urgency) |
+
+> Priority bucket structure and sort rules for Sales tab: TBD.
+
+---
+
+## Branch Queue: Offerings Tab
+
+Contains eligibility-based offering contracts. Separate top-level tab from Collection.
+
+| Work Domain | Sub-type | Entry Condition | Urgency |
+|-------------|----------|----------------|---------|
+| Offerings | Top-up | Customer meets Core Banking top-up eligibility criteria | TBD (campaign priority) |
+| Offerings | Nano | Customer meets Core Banking nano eligibility criteria | TBD (campaign priority) |
+| Offerings | Insurance | Customer meets insurance product eligibility criteria | TBD (campaign priority) |
+
+> Priority bucket structure and sort rules for Offerings tab: TBD.
 
 ---
 
