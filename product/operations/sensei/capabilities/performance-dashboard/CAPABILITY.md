@@ -35,27 +35,27 @@ Provide a consistent performance dashboard for all branch positions — showing 
 
 All positions use the same two features. Role determines which sections are visible and what scope of data is shown.
 
-### Home Dashboard — Sections by Position
+### Home Dashboard — Sections by Level
 
-| Section | CO | Branch Supervisor | AM+ |
-|---------|----|-------------------|-----|
-| **งานที่ต้องจัดการ** — own task queue count | ✅ | ✅ | — |
-| **งานที่พื้นที่ต้องจัดการ** — area contract count | — | — | ✅ |
-| **การตั้งค่าการทำงาน** — sort order, strategy | ✅ | ✅ | ✅ |
-| **ติดตามผลการทำงานของทีม** — per-CO workload table | — | ✅ | — |
-| **ติดตามผลการทำงานของสาขา** — per-branch metrics table | — | — | ✅ |
-| **Exception Alerts** | — | ✅ | — |
-| **Work Queue / Collection List** | ✅ own queue | ✅ own queue | ✅ AM Worklist |
+| Section | Branch | AM+ |
+|---------|--------|-----|
+| **งานที่ต้องจัดการ** — own task queue count | ✅ | — |
+| **งานที่พื้นที่ต้องจัดการ** — area contract count | — | ✅ |
+| **การตั้งค่าการทำงาน** — sort order, strategy | ✅ | ✅ |
+| **ติดตามผลการทำงานของทีม** — per-CO workload table | ✅ | — |
+| **ติดตามผลการทำงานของสาขา** — per-branch metrics table | — | ✅ |
+| **Exception Alerts** | ✅ | — |
+| **Work Queue / Collection List** | ✅ own queue | ✅ AM Worklist |
 
-### Performance Summary — Sections by Position
+### Performance Summary — Sections by Level
 
-| Section | CO | Branch Supervisor | AM+ |
-|---------|----|-------------------|-----|
-| **ภาพรวมการทำงานประจำวันนี้** | ✅ branch-scoped | ✅ branch-scoped | ✅ area-scoped |
-| **ภาพรวมการทำงานเดือนนี้** | ✅ branch-scoped | ✅ branch-scoped | ✅ area-scoped |
-| Staff Self-Service Metrics | 💡 Deferred | 💡 Deferred | — |
-| Monthly Objectives Tracker | 💡 Deferred | 💡 Deferred | — |
-| Branch Rank & Leaderboard | 💡 Deferred | 💡 Deferred | — |
+| Section | Branch | AM+ |
+|---------|--------|-----|
+| **ภาพรวมการทำงานประจำวันนี้** | ✅ branch-scoped | ✅ area-scoped |
+| **ภาพรวมการทำงานเดือนนี้** | ✅ branch-scoped | ✅ area-scoped |
+| Staff Self-Service Metrics | 💡 Deferred | — |
+| Monthly Objectives Tracker | 💡 Deferred | — |
+| Branch Rank & Leaderboard | 💡 Deferred | — |
 
 ---
 
@@ -101,34 +101,31 @@ Shown in monthly view. DPD movement compares เดือนนี้ vs. เด
 
 #### งานที่ต้องจัดการ / งานที่พื้นที่ต้องจัดการ (Summary Widget)
 
-| Role | Widget Shown | Content | Navigation |
-|------|-------------|---------|-----------|
-| CO | งานที่ต้องจัดการ | Total active tasks in own queue today | Click → Work Queue |
-| Branch Supervisor | งานที่ต้องจัดการ | Total active tasks in own queue today | Click → Work Queue |
+| Level | Widget Shown | Content | Navigation |
+|-------|-------------|---------|-----------|
+| Branch | งานที่ต้องจัดการ | Total active tasks in own queue today | Click → Work Queue |
 | AM+ | งานที่พื้นที่ต้องจัดการ | Count of contracts in AM's responsible contract list | Click → AM Worklist |
 
 #### การตั้งค่าการทำงาน (Work Settings)
 
-Available to all positions. Controls: การเรียงลำดับงาน (sort order), Strategy ในการทำงาน.
+Available to all levels. Controls: การเรียงลำดับงาน (sort order), Strategy ในการทำงาน.
 
 #### Tracking Table
 
-| Role | Table Shown | Columns |
-|------|------------|---------|
-| Branch Supervisor | ติดตามผลการทำงานของทีม | Per-CO row: queue size, completed, completion rate, PTP amount, exception flags |
+| Level | Table Shown | Columns |
+|-------|------------|---------|
+| Branch | ติดตามผลการทำงานของทีม | Per-CO row: queue size, completed, completion rate, PTP amount, exception flags |
 | AM+ | ติดตามผลการทำงานของสาขา | Per-branch row: ติดตามหนี้ + เสนอขาย metrics — วันนี้ and สัปดาห์นี้ |
-| CO | — | Not shown |
 
 #### Exception Alerts
 
-Surfaced for Branch Supervisor role only. Not visible to CO or AM+.
+Surfaced for Branch level only. Not visible to AM+.
 
 #### Work Queue / Collection List
 
-| Role | List Shown |
-|------|-----------|
-| CO | Priority-based contract queue (Work Queue) — own assignments |
-| Branch Supervisor | Priority-based contract queue (Work Queue) — own assignments |
+| Level | List Shown |
+|-------|-----------|
+| Branch | Priority-based contract queue (Work Queue) — own assignments |
 | AM+ | AM Worklist — สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (see AM Worklist capability) |
 
 ---
@@ -137,22 +134,20 @@ Surfaced for Branch Supervisor role only. Not visible to CO or AM+.
 
 #### ภาพรวมการทำงานประจำวันนี้ (Daily Snapshot)
 
-Available to all positions. Data scope differs by role:
+Available to all levels. Data scope differs by level:
 
-| Role | Scope | Content |
-|------|-------|---------|
-| CO | Branch | การขาย metrics vs. plan (see Metric Registry) |
-| Branch Supervisor | Branch | การขาย metrics vs. plan (see Metric Registry) |
+| Level | Scope | Content |
+|-------|-------|---------|
+| Branch | Branch | การขาย metrics vs. plan (see Metric Registry) |
 | AM+ | Area | การขาย metrics vs. plan scoped to area |
 
 #### ภาพรวมการทำงานเดือนนี้ (Monthly Cumulative)
 
-Available to all positions. Data scope differs by role:
+Available to all levels. Data scope differs by level:
 
-| Role | Scope | Content |
-|------|-------|---------|
-| CO | Branch | การขาย + การเก็บหนี้ + DPD movement vs. target |
-| Branch Supervisor | Branch | การขาย + การเก็บหนี้ + DPD movement vs. target |
+| Level | Scope | Content |
+|-------|-------|---------|
+| Branch | Branch | การขาย + การเก็บหนี้ + DPD movement vs. target |
 | AM+ | Area | การขาย + การเก็บหนี้ + DPD movement vs. target scoped to area |
 
 ---
