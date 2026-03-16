@@ -44,8 +44,6 @@ All positions use the same two features. Role determines which sections are visi
 | **การตั้งค่าการทำงาน** — sort order, strategy | ✅ | ✅ |
 | **ติดตามผลการทำงานของทีม** — per-CO workload table | ✅ | — |
 | **ติดตามผลการทำงานของสาขา** — per-branch metrics table | — | ✅ |
-| **Exception Alerts** | ✅ | — |
-| **Work Queue / Collection List** | ✅ own queue | ✅ AM Worklist |
 
 ### Performance Summary — Sections by Level
 
@@ -117,17 +115,6 @@ Available to all levels. Controls: การเรียงลำดับงา
 | Branch | ติดตามผลการทำงานของทีม | Per-CO row: queue size, completed, completion rate, PTP amount, exception flags |
 | AM+ | ติดตามผลการทำงานของสาขา | Per-branch row: ติดตามหนี้ + เสนอขาย metrics — วันนี้ and สัปดาห์นี้ |
 
-#### Exception Alerts
-
-Surfaced for Branch level only. Not visible to AM+.
-
-#### Work Queue / Collection List
-
-| Level | List Shown |
-|-------|-----------|
-| Branch | Priority-based contract queue (Work Queue) — own assignments |
-| AM+ | AM Worklist — สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (see AM Worklist capability) |
-
 ---
 
 ### Feature 2: Performance Summary
@@ -157,5 +144,4 @@ Available to all levels. Data scope differs by level:
 | NFR | Requirement |
 |-----|-------------|
 | Real-time updates | Both features update without page reload (near-real-time, ≤ 30 seconds) |
-| Exception alerting | Branch exceptions surfaced within 5 minutes of trigger condition |
 | Historical data | Monthly objectives and PTP data retained for at least 12 months |
