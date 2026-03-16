@@ -28,9 +28,8 @@ Provide a unified task tracking system for branches — aggregating work from Se
 | Task Lifecycle Manager | Draft | CREATED → ASSIGNED → ACTIVE → CLOSED state machine with OVERDUE and ESCALATED side states |
 | External Task Creation Contract | Draft | Consume TaskCreationRequest events from Onigiri, Matcha, and other systems |
 | Task Completion Feedback | Draft | Publish TaskCompleted event with outcome, source_ref_id, source_callback for upstream system routing |
-| Required Field Validation | Draft | On task closure, validate required fields per action type outcome as defined in Playbook Engine → Action Type Registry |
 | Supervisor Task Controls | Draft | Reassign, override playbook step, add manual task, bulk operations |
-| SLA Enforcement | Draft | Transition task to OVERDUE when SLA deadline exceeded; SLA values read from Playbook Engine → SLA Defaults. Surface in supervisor exception panel. |
+| SLA Enforcement | Draft | Transition task to OVERDUE when SLA deadline exceeded; SLA deadline values read from Playbook Engine → Timing Parameters by Objective. Surface in supervisor exception panel. |
 | Contact Limit Pre-Check | Draft | Query BOS collection note log before creating any contact task — if customer's daily limit is reached, task is suppressed and contract flagged in supervisor exception panel |
 | Contact Window Enforcement | Draft | Subscribe to ContactWindowClosed event from DaVinci; do not create contact tasks outside business hours |
 | ContactRecorded Feedback | Draft | Publish ContactRecorded event to DaVinci after every contact task (Call / Visit) closure so the centralized cross-product contact count stays accurate |
@@ -76,7 +75,7 @@ Both path types land in the **same worklist** and follow the same task lifecycle
 When a CO closes a task, Task Engine always publishes a `TaskCompleted` event. The routing depends on the task source:
 
 ```
-CO records outcome → Task Engine validates required fields → task moves to CLOSED
+CO records outcome → task moves to CLOSED
         ↓
   TaskCompleted event published (always — even if source_callback is null)
         ↓
@@ -117,7 +116,7 @@ Task Engine does not know what the upstream system does with the outcome — it 
 ```
 TaskCreationRequest {
   customer_id        // DaVinci customer ID (required)
-  action_type        // must match a valid action type in Template Library → Action Type Registry (required)
+  action_type        // must match a valid action type in Playbook Engine → Action Type Registry (required)
   title              // Human-readable, e.g., "เก็บเอกสาร KYC" (required)
   description        // Context for the CO (optional)
   priority           // high | normal | low (default: normal)
