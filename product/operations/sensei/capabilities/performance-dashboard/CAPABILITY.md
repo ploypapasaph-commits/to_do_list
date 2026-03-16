@@ -52,7 +52,6 @@ All positions use the same two features. Role determines which sections are visi
 | **ภาพรวมการทำงานประจำวันนี้** | ✅ branch-scoped | ✅ area-scoped |
 | **ภาพรวมการทำงานเดือนนี้** | ✅ branch-scoped | ✅ area-scoped |
 | Staff Self-Service Metrics | 💡 Deferred | — |
-| Monthly Objectives Tracker | 💡 Deferred | — |
 | Branch Rank & Leaderboard | 💡 Deferred | — |
 
 ---
@@ -144,4 +143,4 @@ Available to all levels. Data scope differs by level:
 | NFR | Requirement |
 |-----|-------------|
 | Real-time updates | Both features update without page reload (near-real-time, ≤ 30 seconds) |
-| Historical data | Monthly objectives and PTP data retained for at least 12 months |
+| Historical data | PTP data retained for at least 12 months |
