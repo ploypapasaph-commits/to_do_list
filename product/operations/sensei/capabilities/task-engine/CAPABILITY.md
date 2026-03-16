@@ -83,7 +83,9 @@ CO records outcome → task moves to CLOSED
   │ source = playbook_step                              │
   │   → Playbook Engine receives outcome                │
   │   → Routes to next Objective in chain               │
-  │   → Or escalates contract to AM Worklist            │
+  │   → Or fires "ส่งเรื่องให้ผู้จัดการพื้นที่":       │
+  │       branch task closes; contract moves atomically │
+  │       into AM's Work Queue; no new task created     │
   └─────────────────────────────────────────────────────┘
   ┌─────────────────────────────────────────────────────┐
   │ source = external                                   │

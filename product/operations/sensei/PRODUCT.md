@@ -33,7 +33,7 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 - Performance & Visibility Dashboard: supervisor team workload + exception alerts; staff self-service metrics + gamified leaderboard
 - Contact compliance **enforcement**: Task Engine queries BOS collection note log at task generation time (if daily limit reached → task suppressed); subscribes to ContactWindowClosed event for business hours enforcement; publishes ContactRecorded to DaVinci on every Call/Visit closure
 - Action verification: cross-reference recorded Call outcomes against BOS collection note log (trust-but-verify; does not block CO workflow); verification status and mismatches surfaced in Performance Dashboard
-- AM Worklist: area manager operational queue for escalated and manually-added contracts; AM assign / legal action / find new address actions
+- AM execution queue (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่): auto-escalated and manually-added contracts in Work Queue (AM view); AM assign / legal action / find new address actions
 
 **This product IS NOT responsible for:**
 - Contact compliance **data ownership** — contact log, frequency limits, cross-product aggregation (owned by **DaVinci**)
@@ -64,9 +64,8 @@ A centralized branch worklist and task orchestration platform. Aggregates all br
 |-----------|-------|--------|-------|-------------|
 | [Playbook Engine](capabilities/playbook-engine/CAPABILITY.md) | Product | Draft | 1 — HQ Configuration · 2 — Event Ingestion | Single source of truth for collection task configuration and evaluation logic. Gate evaluation, rule chain (objective selection), action types, SLA defaults, timing parameters, compliance-locked steps, HQ System Templates, Branch Variant fork model, setting governance. Re-evaluates after every task closure — no hardcoded transition routing. |
 | [Task Engine](capabilities/task-engine/CAPABILITY.md) | Engineering | Draft | 2 — Event Ingestion · 3 — CO Execution | Unified task lifecycle (CREATED → ASSIGNED → ACTIVE → CLOSED + OVERDUE + ESCALATED). 3 task sources: playbook_step, manual, external. Contact limit pre-check + ContactWindowClosed enforcement. ContactRecorded feedback to DaVinci. TaskCompleted feedback events. |
-| [Work Queue](capabilities/work-queue/CAPABILITY.md) | Engineering | Draft | 3 — CO Execution | Grouped action buckets (Calls/Visits/Admin). Priority sub-groups (Overdue > High DPD > Normal). One-by-one primary mode. Rapid-fire extended mode. Daily contact limit enforcement. |
-| [Performance Dashboard](capabilities/performance-dashboard/CAPABILITY.md) | Product | Draft | 5 — Management Oversight | Supervisor view: team workload table, active playbooks, exception panel (5 alert types), daily scorecard, contact compliance status. Staff view: personal metrics, monthly objectives, branch rank, gamified leaderboard, supervisor feedback. |
-| [AM Worklist](capabilities/am-worklist/CAPABILITY.md) | Product | Draft | 5 — Management Oversight | AM's operational contract list — สัญญาที่อยู่ภายใต้การดูแลของพื้นที่. Auto-escalated from expired เอาวันนัดชำระ tasks + manually pulled by AM from branch collection list. AM actions: AM assign (มอบหมายงาน), legal action (ดำเนินคดี), find new address (หาที่อยู่ใหม่). |
+| [Work Queue](capabilities/work-queue/CAPABILITY.md) | Engineering | Draft | 3 — CO Execution · 5 — Management Oversight | Branch: P1–P4 priority buckets, contract table with urgency display, one-by-one processing mode. AM+: สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ — escalated + manually-added contracts; AM actions: มอบหมายงาน / ดำเนินคดี / หาที่อยู่ใหม่. |
+| [Performance Dashboard](capabilities/performance-dashboard/CAPABILITY.md) | Product | Draft | 5 — Management Oversight | Home Dashboard + Performance Summary for all levels (Branch and AM+); role-scoped widgets and metrics. AM+: Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา) — full contract list per branch for AM oversight and manual pull into Work Queue. |
 
 ---
 

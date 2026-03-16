@@ -10,7 +10,7 @@
 
 ## Business Function
 
-Present field staff with a prioritized work queue organized by event priority (P1–P4), where each priority bucket displays a sortable contract table. COs drill into a contract row to access the customer page with full collection history and notes.
+Present all levels with a role-scoped work queue. Branch staff see a prioritized queue organized by event priority (P1–P4). AM+ see their responsible contract list (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่) — escalated and manually-added contracts awaiting AM action. Both levels drill into a contract row to access the customer page.
 
 ## Why It Exists (First Principles)
 
@@ -23,14 +23,15 @@ Present field staff with a prioritized work queue organized by event priority (P
 
 ## Feature Inventory
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Priority Buckets (P1–P4) | Draft | Queue organized into four priority tabs; each tab shows a contract table |
-| Contract Table View | Draft | Sortable table per priority bucket with all key contract fields |
-| Urgency Display | Draft | Surfaces `risk_level` (1–6) for Active portfolio contracts and `easiness_to_collect` (1–7) for Write-off contracts as the urgency value in the contract table; used for sort order within each priority bucket |
-| Customer Page Drill-Through | Draft | Clicking a contract row opens the customer page with collection log and notes |
-| One-by-One Processing Mode | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
-| Queue Overview Header | Draft | Top-level summary: total contracts today, completed, overdue |
+| Feature | Level | Status | Description |
+|---------|-------|--------|-------------|
+| Priority Buckets (P1–P4) | Branch | Draft | Queue organized into four priority tabs; each tab shows a contract table |
+| Contract Table View | Branch | Draft | Sortable table per priority bucket with all key contract fields |
+| Urgency Display | Branch | Draft | Surfaces `risk_level` (1–6) for Active portfolio contracts and `easiness_to_collect` (1–7) for Write-off contracts as the urgency value in the contract table; used for sort order within each priority bucket |
+| Customer Page Drill-Through | Branch + AM+ | Draft | Clicking a contract row opens the customer page with collection log and notes |
+| One-by-One Processing Mode | Branch | Draft | Primary mode: select contract row, view customer page, execute action, record outcome |
+| Queue Overview Header | Branch | Draft | Top-level summary: total contracts today, completed, overdue |
+| AM Responsible Contracts (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่) | AM+ | Draft | AM's execution queue — escalated and manually-added contracts; AM chooses one of three actions per contract |
 
 ---
 
@@ -51,7 +52,7 @@ Priority is assigned by Work Queue based on the contract's current state at disp
 | **P2** | วันนัดเลยวันครบกำหนดชำระแล้ว แต่มีวันนัดชำระ | `due_date < today` AND `PTP_date` is set |
 | **P3** | เลยวันครบกำหนดชำระ แต่ยังไม่มีนัดชำระ | `PTP_date` is null AND `due_date < today` |
 | **P3** | ยังไม่ถึงวันครบกำหนดชำระ แต่ยังไม่มีนัดชำระ | `PTP_date` is null AND `due_date > today` (outside P1/P2 window) |
-| **P3** | ผู้จัดการพื้นที่ ตีกลับ | Contract returned from AM Worklist pool to branch CO queue |
+| **P3** | ผู้จัดการพื้นที่ ตีกลับ | Contract returned from AM's responsible contracts back to branch CO queue |
 | **P4** | Write Off | `contract.status = write_off` |
 
 > Conditions are evaluated top-down — first matching condition wins. A contract's P-group can shift between sessions as its state changes (e.g., PTP set → moves from P3 to P2/P1). Work Queue always reads current contract state.
@@ -106,6 +107,43 @@ This value drives sort order within each priority bucket (see Default sort order
 
 ---
 
+## AM+ Queue: สัญญาที่อยู่ภายใต้การดูแลของพื้นที่
+
+AM's execution queue — parallel to the Branch P1–P4 queue but scoped to AM level.
+
+### Entry Routes
+
+| Route | Trigger |
+|-------|---------|
+| Auto-escalated | "ส่งเรื่องให้ผู้จัดการพื้นที่" outcome from Playbook Engine — branch task closes, contract moves atomically to AM's queue; no new branch task created |
+| Manually added | AM pulls a contract from Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา) in Performance Dashboard |
+
+### AM Actions per Contract
+
+AM chooses one of three actions for each contract in their queue:
+
+| Action | Thai Name | Description |
+|--------|-----------|-------------|
+| AM assign | มอบหมายงาน | Assign back to original branch, reassign to another branch in area, or handle directly as AM |
+| Legal action | ดำเนินคดี | Escalate contract to legal proceedings |
+| Find new address | หาที่อยู่ใหม่ | Initiate address search for uncontactable customer |
+
+### AM Queue Columns
+
+| Column | Description |
+|--------|-------------|
+| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
+| Due date | Relevant due date (color-coded: overdue = orange/red) |
+| สถานะการจ่าย | Payment status badge |
+| ยอดตามคาดการณ์ | Forecasted payment amount |
+| วันที่ติดต่อล่าสุด | Date of most recent contact |
+| ผลการติดต่อล่าสุด | Outcome of most recent contact |
+| สาขาต้นทาง | Source branch |
+| มอบหมายให้สาขา | Dropdown: assign to branch (or keep with AM) |
+| หมายเหตุ | Free-text note |
+
+---
+
 ## NFRs
 
 | NFR | Requirement |
@@ -113,3 +151,5 @@ This value drives sort order within each priority bucket (see Default sort order
 | Target throughput | Queue UX must support 300–500 task completions per CO per day |
 | Pre-loaded context | Customer page and collection log must load without additional navigation steps |
 | Table performance | Contract table must render within 2 seconds for up to 500 rows per bucket |
+| Escalation atomicity | When "ส่งเรื่องให้ผู้จัดการพื้นที่" fires, contract must appear in AM's queue atomically — no task gap, no duplicate |
+| AM queue real-time | AM's responsible contract list updates within 30 seconds of escalation or manual addition |

@@ -24,6 +24,8 @@
 
 ### Configuration Ownership
 
+> **Authoritative governance source**: The full setting governance table — including which role can add/adjust/change each setting category — is defined in the **[Template Library](../capabilities/template-library/CAPABILITY.md)** capability. The table below is a summary scoped to Playbook Engine components only.
+
 All business logic components are **fully configurable** (add / adjust / change) by the appropriate role. The only fixed element is the **Objective Configurations structure** (its columns/schema), which is system-defined and immutable.
 
 | Component | Add | Adjust | Change | Who |
@@ -442,7 +444,7 @@ Accelerated mode for experienced COs on high-volume buckets:
 | **Summary Widget** | งานที่ต้องจัดการ — active task count | งานที่พื้นที่ต้องจัดการ — AM contract count |
 | **Work Setting** | การเรียงลำดับงาน / Strategy | การเรียงลำดับงาน / Strategy |
 | **Tracking Table** | Team workload per CO | Branch performance per branch (daily + weekly) |
-| **Collection List** | Work Queue (priority-based) | → AM Worklist (Section 6): สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ + การติดตามหนี้ในแต่ละสาขา |
+| **Collection List** | Work Queue (priority-based) | Work Queue (AM view): สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ |
 | **Performance Summary** | Daily/weekly/monthly scorecard + leaderboard | Area targets + DPD movement |
 
 ---
@@ -484,9 +486,13 @@ Accelerated mode for experienced COs on high-volume buckets:
 | **ภาพรวมการทำงานเดือนนี้** | Monthly cumulative vs. target |
 | **การไหลของ DPD** | DPD movement (C to X, X to 30) — current and prior month |
 
-#### B2 & B3: AM Contract Lists
+#### B2. AM Execution Queue (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่)
 
-Moved to **AM Worklist** capability — see [Section 6](#6-core-capability-am-worklist).
+Moved to **Work Queue** capability (AM+ queue section).
+
+#### B3. Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา)
+
+Moved to **Performance Dashboard** capability (Feature 3).
 
 ---
 
@@ -583,69 +589,11 @@ Fields the CO must complete before saving — sourced from Template Library defi
 
 ---
 
-## 6. Core Capability: AM Worklist
+## 6. AM Execution Queue & Branch Collection Browse
 
-**Goal**: Provide the Area Manager (AM) with an operational contract list for managing escalated and manually-added contracts — separate from the performance monitoring dashboard.
-
-### Why It Exists (First Principles)
-
-- **Escalation End-Point**: When collection exhausts branch-level attempts (ไม่ได้ทำ หมดอายุ on เอาวันนัดชำระ), the contract needs AM-level action. Without a dedicated list, escalated contracts have no clear ownership.
-- **AM Agency**: AMs can proactively pull any high-risk contract from any branch into their direct oversight — not only wait for auto-escalation.
-- **Action-Oriented**: AM's Responsible Contracts is an execution queue, not a monitoring report. Each contract surfaces AM-only actions.
-- **Separation of Concerns**: Monitoring belongs in Performance Dashboard. Execution belongs in AM Worklist.
-
-### Entry Routes
-
-| Route | Trigger |
-|-------|---------|
-| **Auto-escalated** | "ส่งเรื่องให้ผู้จัดการพื้นที่" outcome on เอาวันนัดชำระ expiry — **no new task created** |
-| **Manually added** | AM pulls any contract from การติดตามหนี้ในแต่ละสาขา at any time |
-
-### AM Actions per Contract
-
-| Action | Thai Name | Description |
-|--------|-----------|-------------|
-| AM assign | มอบหมายงาน | Assign back to original branch, reassign to another branch, or handle directly |
-| Legal action | ดำเนินคดี | Escalate contract to legal proceedings |
-| Find new address | หาที่อยู่ใหม่ | Initiate address search for uncontactable customer |
-
-### B2. สัญญาที่อยู่ภายใต้การดูแลของพื้นที่ (AM's Responsible Contracts)
-
-AM's active action queue — contracts with no pending branch task; AM owns the next decision.
-
-| Column | Description |
-|--------|-------------|
-| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
-| Due date | Relevant due date (overdue = orange/red) |
-| สถานะการจ่าย | Payment status badge |
-| ยอดตามคาดการณ์ | Forecasted payment amount |
-| วันที่ติดต่อล่าสุด | Date of most recent contact |
-| ผลการติดต่อล่าสุด | Outcome of most recent contact |
-| สาขาต้นทาง | Source branch |
-| มอบหมายให้สาขา | Dropdown: assign to branch (or keep with AM) |
-| หมายเหตุ | Free-text note |
-
-### B3. การติดตามหนี้ในแต่ละสาขา (Branch Collection Browse)
-
-Full contract list per branch. AM reads, filters, and can pull any contract into their responsible list. Clicking a row opens the customer page.
-
-**Filters**: Search by ชื่อ-นามสกุล / เลขที่สัญญา / เบอร์โทร / เลขโปรเจคติด / เลขบัตรประชาชน; filter by เลขแมนเอดิต, ถ่วตัวรอง.
-
-| Column | Description |
-|--------|-------------|
-| ความเสี่ยง | Risk level (color-coded) |
-| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
-| % ต่อพอร์ต | Contract weight as % of branch portfolio |
-| Due date | Relevant due date |
-| Action | Recommended action for current Objective |
-| ผลลัพธ์ที่คาดหวัง | Current Objective (e.g., เอาวันนัดชำระ) |
-| สถานการจ่าย | Payment status badge |
-| ยอดตามคาดการณ์ | Forecasted payment amount |
-| วันที่ติดต่อล่าสุด | Date of most recent contact |
-| ผลการติดตามล่าสุด | Outcome of most recent contact |
-| สาขา | Branch name |
-| ผู้รับผิดชอบเพิ่มเติม | Additional CO(s) assigned |
-| เรื่องกฎสัญญา | Compliance flag (⚠ if issue exists) |
+> Content dissolved into existing capabilities:
+> - **AM execution queue** (สัญญาที่อยู่ภายใต้การดูแลของพื้นที่) → [Work Queue](capabilities/work-queue/CAPABILITY.md) — AM+ queue section
+> - **Branch Collection Browse** (การติดตามหนี้ในแต่ละสาขา) → [Performance Dashboard](capabilities/performance-dashboard/CAPABILITY.md) — Feature 3
 
 ---
 

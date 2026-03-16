@@ -25,8 +25,9 @@ Provide a consistent performance dashboard for all branch positions — showing 
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Home Dashboard | Draft | Entry screen for all positions — summary widget, work settings, tracking table, and collection list; visible sections and data scope determined by role |
-| Performance Summary | Draft | Daily and monthly performance view for all positions — การขาย and การเก็บหนี้ metrics; data scope determined by role |
+| Home Dashboard | Draft | Entry screen for all levels — summary widget, work settings, and tracking table; visible sections and data scope determined by level |
+| Performance Summary | Draft | Daily and monthly performance view for all levels — การขาย and การเก็บหนี้ metrics; data scope determined by level |
+| Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา) | AM+ | Draft | Full contract list per branch under AM's area — AM reads, filters, and pulls any contract into their Work Queue |
 | Staff Self-Service Metrics | 💡 Good-to-Have | Personal metrics: tasks completed, PTP rate, visit success, SLA compliance. Not in current scope — deferred. |
 
 ---
@@ -44,6 +45,7 @@ All positions use the same two features. Role determines which sections are visi
 | **การตั้งค่าการทำงาน** — sort order, strategy | ✅ | ✅ |
 | **ติดตามผลการทำงานของทีม** — per-CO workload table | ✅ | — |
 | **ติดตามผลการทำงานของสาขา** — per-branch metrics table | — | ✅ |
+| **Branch Collection Browse** — full contract list per branch | — | ✅ |
 
 ### Performance Summary — Sections by Level
 
@@ -101,7 +103,7 @@ Shown in monthly view. DPD movement compares เดือนนี้ vs. เด
 | Level | Widget Shown | Content | Navigation |
 |-------|-------------|---------|-----------|
 | Branch | งานที่ต้องจัดการ | Total active tasks in own queue today | Click → Work Queue |
-| AM+ | งานที่พื้นที่ต้องจัดการ | Count of contracts in AM's responsible contract list | Click → AM Worklist |
+| AM+ | งานที่พื้นที่ต้องจัดการ | Count of contracts in AM's responsible contract list | Click → Work Queue (AM view) |
 
 #### การตั้งค่าการทำงาน (Work Settings)
 
@@ -116,7 +118,31 @@ Available to all levels. Controls: การเรียงลำดับงา
 
 ---
 
-### Feature 2: Performance Summary
+### Feature 3: Branch Collection Browse (การติดตามหนี้ในแต่ละสาขา)
+
+Available to AM+ only. Full contract list per branch under AM's area. AM reads, filters, and can pull any contract into their Work Queue (AM view). Clicking a contract row opens the customer page.
+
+**Filters**: Search by ชื่อ-นามสกุล / เลขที่สัญญา / เบอร์โทร / เลขโปรเจคติด / เลขบัตรประชาชน; filter by เลขแมนเอดิต, ถ่วตัวรอง.
+
+| Column | Description |
+|--------|-------------|
+| ความเสี่ยง | Risk level (color-coded: เสี่ยงสูง red, เสี่ยงกลาง orange, เสี่ยงต่ำ green/blue) |
+| ชื่อ-นามสกุล (ชื่อเล่น) | Customer full name and nickname |
+| % ต่อพอร์ต | Contract weight as % of branch portfolio |
+| Due date | Relevant due date |
+| Action | Recommended action for current Objective |
+| ผลลัพธ์ที่คาดหวัง | Current Objective (e.g., เอาวันนัดชำระ) |
+| สถานการจ่าย | Payment status badge |
+| ยอดตามคาดการณ์ | Forecasted payment amount |
+| วันที่ติดต่อล่าสุด | Date of most recent contact |
+| ผลการติดตามล่าสุด | Outcome of most recent contact |
+| สาขา | Branch name |
+| ผู้รับผิดชอบเพิ่มเติม | Additional CO(s) assigned |
+| เรื่องกฎสัญญา | Compliance flag (⚠ if issue exists) |
+
+---
+
+### Feature 4: Performance Summary
 
 #### ภาพรวมการทำงานประจำวันนี้ (Daily Snapshot)
 
@@ -143,4 +169,5 @@ Available to all levels. Data scope differs by level:
 | NFR | Requirement |
 |-----|-------------|
 | Real-time updates | Both features update without page reload (near-real-time, ≤ 30 seconds) |
+| Branch Collection Browse performance | การติดตามหนี้ในแต่ละสาขา must render within 2 seconds for full branch portfolio |
 | Historical data | PTP data retained for at least 12 months |
