@@ -73,25 +73,25 @@ All conditions within the same rule number are **AND**. Rules 6–9 are each sin
 
 > Contact counts (`การติดต่อ X`) are tracked **per objective type** — not total contacts. Each objective has its own counter, reset per installment cycle.
 
-| # | Objective | Factor | Condition | Adjustable By |
-|---|---|---|---|---|
-| 1 | เอาวันนัดชำระ | วันครบกำหนดชำระ | วันครบกำหนดชำระ ภายใน 7 วัน | HQ only |
-| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน | HQ only |
-| 1 | เอาวันนัดชำระ | การติดต่อเอาวันนัดชำระ | ≤ 3 ครั้งในงวดนี้ | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | พฤติกรรมลูกค้า | ≠ ผิดนัดชำระบ่อย / ผิดนัดชำระบางครั้ง | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 3 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน | HQ only |
-| 3 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 4 | เก็บยอดตามนัดชำระ | วันนัดชำระ | = วันนี้ | HQ only |
-| 4 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 5 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) | HQ only |
-| 5 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเอาวันนัดชำระ | > 3 ครั้งในงวดนี้ | HQ only |
-| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
-| 8 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
-| 9 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ | HQ only |
-| Default | ติดตามหนี้ | — | Gate passes AND no rule above matched | HQ only |
+| # | Objective | Factor | Condition |
+|---|---|---|---|
+| 1 | เอาวันนัดชำระ | วันครบกำหนดชำระ | วันครบกำหนดชำระ ภายใน 7 วัน |
+| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน |
+| 1 | เอาวันนัดชำระ | การติดต่อเอาวันนัดชำระ | ≤ 3 ครั้งในงวดนี้ |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | พฤติกรรมลูกค้า | ≠ ผิดนัดชำระบ่อย / ผิดนัดชำระบางครั้ง |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ |
+| 3 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ AND ภายใน 1 วัน |
+| 3 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ |
+| 4 | เก็บยอดตามนัดชำระ | วันนัดชำระ | = วันนี้ |
+| 4 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดฯ | ≤ 1 ครั้งในงวดนี้ |
+| 5 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) |
+| 5 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ |
+| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเอาวันนัดชำระ | > 3 ครั้งในงวดนี้ |
+| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ |
+| 8 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ |
+| 9 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ |
+| Default | ติดตามหนี้ | — | Gate passes AND no rule above matched |
 
 **Worked examples:**
 
@@ -118,20 +118,20 @@ All conditions within the same rule number are **AND**. Rules 5–7 are each sin
 
 > **Rule 1 cooldown**: Unlike Collection: Active (which caps by count), Write-off uses a 5-day cooldown between contact attempts. Rule 1 fires as long as no PTP is set and the last contact was > 5 days ago (or never contacted). This produces a contact rhythm of every 6 days (5-day gap + day of contact).
 
-| # | Objective | Factor | Condition | Adjustable By |
-|---|---|---|---|---|
-| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน | HQ only |
-| 1 | เอาวันนัดชำระ | การติดต่อ | ยังไม่ได้ติดต่อใน 5 วัน | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ ภายใน 1 วัน | HQ only |
-| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 3 | เก็บยอดตามนัดชำระ | วันนัดชำระ | วันนัดชำระ = วันนี้ | HQ only |
-| 3 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดตามนัดชำระ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 4 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) | HQ only |
-| 4 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ | HQ only |
-| 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
-| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ | HQ only |
-| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ | HQ only |
-| Default | ติดตามหนี้ | — | Gate passes AND no rule matched | HQ only |
+| # | Objective | Factor | Condition |
+|---|---|---|---|
+| 1 | เอาวันนัดชำระ | วันนัดชำระ | ยังไม่มีวันนัดชำระในงวด/เดือน |
+| 1 | เอาวันนัดชำระ | การติดต่อ | ยังไม่ได้ติดต่อใน 5 วัน |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | วันนัดชำระ | มีวันนัดชำระ ภายใน 1 วัน |
+| 2 | แจ้งเตือนยืนยันนัดชำระ | การติดต่อแจ้งเตือนฯ | ≤ 1 ครั้งในงวดนี้ |
+| 3 | เก็บยอดตามนัดชำระ | วันนัดชำระ | วันนัดชำระ = วันนี้ |
+| 3 | เก็บยอดตามนัดชำระ | การติดต่อเก็บยอดตามนัดชำระ | ≤ 1 ครั้งในงวดนี้ |
+| 4 | ลงพื้นที่ | สถานะ PTP | (PTP_date is null AND due_date < today) OR (PTP_date < today AND no payment recorded) |
+| 4 | ลงพื้นที่ | การติดต่อลงพื้นที่ | ≤ 1 ครั้งในงวดนี้ |
+| 5 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อแจ้งเตือนยืนยันนัดชำระ | > 1 ครั้งในงวดนี้ |
+| 6 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อเก็บยอดตามนัดชำระ | > 1 ครั้งในงวดนี้ |
+| 7 | ส่งเรื่องให้ผู้จัดการพื้นที่ 🔒 | การติดต่อลงพื้นที่ | > 1 ครั้งในงวดนี้ |
+| Default | ติดตามหนี้ | — | Gate passes AND no rule matched |
 
 **Worked examples:**
 
@@ -165,25 +165,21 @@ How a CO works the task after it appears in their queue.
 
 ### 2.1 Action Types
 
-Each objective is configured with a default action type. Action types are HQ-defined — no action type can be used unless it exists in the registry below.
+Each objective is configured with a default action type. Action types are HQ-defined — no action type can be used unless it exists in the registry below. Outcomes are recorded in the collection log.
 
-| Action Type | Typed Outcomes | Required Fields on Specific Outcomes |
-|-------------|----------------|--------------------------------------|
-| 📞 Call | PTP, No Answer, Refused, Callback, Wrong Number, Line Busy, Voicemail | PTP → PTP amount + PTP date; Callback → scheduled date/time |
-| 🏠 Visit | Met Customer, Not Home, Address Invalid, PTP (in-person), Refused | PTP → PTP amount + PTP date; Address Invalid → new address |
-| 📋 Admin | Completed, Incomplete, Escalated | Escalated → escalation reason |
-| ⏳ Wait | (auto-advances; no manual outcome) | — |
-| 🔔 Notify Supervisor | Acknowledged, No Response | — |
-| 📧 Send Notification | (system-dispatched; Delivered/Failed) | — |
+| Action Type | Typed Outcomes |
+|-------------|----------------|
+| 📞 Call | PTP, No Answer, Refused, Callback, Wrong Number, Line Busy, Voicemail |
+| 🏠 Visit | Met Customer, Not Home, Address Invalid, PTP (in-person), Refused |
 
-**Default action per objective** (AM can adjust within HQ limits):
+**Default action per objective:**
 
 | Objective | Default Action |
 |---|---|
 | เอาวันนัดชำระ | 📞 Call |
 | แจ้งเตือนยืนยันนัดชำระ | 📞 Call |
 | เก็บยอดตามนัดชำระ | 📞 Call |
-| ติดตามเข้มงวด — รอบแรก | 🏠 Visit 🔒 |
+| ลงพื้นที่ | 🏠 Visit 🔒 |
 | ติดตามหนี้ | 📞 Call |
 
 ---
@@ -217,16 +213,7 @@ CO records one outcome per task on closure. Each outcome updates one or more con
 
 ### 2.4 Supervisor Customization
 
-Supervisors fork a System Template into a Branch Variant and may adjust within the following rules:
-
-| Allowed | Not Allowed |
-|---------|-------------|
-| Reorder non-locked steps | Delete 🔒 locked steps |
-| Add optional steps | Edit System Templates directly |
-| Add/remove outcomes on non-locked steps | Modify outcome options on 🔒 locked steps |
-| Adjust timing (within HQ-set limits) | Reorder locked steps past compliance boundary |
-| Change assignee rules | Bypass publishing workflow |
-| Set retry limits on non-locked outcomes | Modify urgency-tier assignments |
+> 💡 Not available in current scope. Supervisor-level template customization (branch variants, timing adjustments, step reordering) is a planned future capability.
 
 ---
 
@@ -294,28 +281,14 @@ This table is the **authoritative source** for role-based access across all Play
 |-----------------|-----|--------|--------|-----|
 | Action types (name, properties) | ✅ | ✅ | ✅ | HQ only |
 | Outcomes per action type | ✅ | ✅ | ✅ | HQ only |
-| Required fields per outcome | ✅ | ✅ | ✅ | HQ only |
-| SLA defaults per action type | ✅ | ✅ | ✅ | HQ (global default); AM (per branch variant, within HQ limits) |
-| Retry limits per action type | ✅ | ✅ | ✅ | HQ (global default); AM (per branch variant, within HQ limits) |
 | Priority event mapping (event → P1–P4) | ✅ | ✅ | ✅ | HQ only |
 | Gate configurations (per portfolio type) | ✅ | ✅ | ✅ | HQ only |
-| Rule chain order and conditions (per portfolio type) | ✅ | ❌ | ❌ | HQ only — HQ defines each portfolio type's chain; order and conditions are system-enforced once set |
-| Objective timing & action (values) | ✅ | ✅ | ✅ | HQ (global default); AM (within HQ limits) |
-| Compliance-locked steps | ✅ | ❌ | ❌ | HQ only — lock/unlock |
+| Rule chain order and conditions (per portfolio type) | ✅ | ✅ | ✅ | HQ only |
+| Objective timing & action (values) | ✅ | ✅ | ✅ | HQ only |
+| Compliance-locked steps | ✅ | ✅ | ✅ | HQ only |
 | Playbook Engine structure (schema) | ❌ | ❌ | ❌ | System-defined — immutable |
 
 > **Branch variant scope**: AM adjustments apply to their branch variant only. HQ global default is unchanged. AM adjustments cannot exceed HQ-set limits.
-
----
-
-### SLA Defaults by Action Type
-
-| Action Type | Default SLA | Adjustable By |
-|-------------|-------------|---------------|
-| 📞 Call | 4 hours | AM (per branch variant, within HQ limits) |
-| 🏠 Visit | 8 hours | AM (per branch variant, within HQ limits) |
-| 📋 Admin | 24 hours | AM (per branch variant, within HQ limits) |
-| ⏳ Wait | Duration defined in objective configuration | HQ only |
 
 ---
 
