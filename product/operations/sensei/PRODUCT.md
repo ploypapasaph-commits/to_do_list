@@ -84,29 +84,29 @@ flowchart TD
     classDef rejectNode fill:#b91c1c,stroke:#7f1d1d,color:#fff
 
     subgraph SOURCES["Task Sources"]
-        EV(["📡 Contract Event\nDaVinci / Core Banking / Policy Admin"])
-        EXT(["📨 TaskCreationRequest\nOnigiri · Matcha"])
-        MAN(["👤 Manual Task\nSupervisor UI"])
+        EV(["📡 Contract Event<br/>DaVinci / Core Banking / Policy Admin"])
+        EXT(["📨 TaskCreationRequest<br/>Onigiri · Matcha"])
+        MAN(["👤 Manual Task<br/>Supervisor UI"])
     end
 
     subgraph PLAYBOOK_PATH["Playbook Path (source = playbook_step)"]
-        PP1{"① Dedup\nActive task exists\nfor this contract?"}
-        PP2a{"② Playbook Gate\nContract eligible\nfor this objective?"}
-        PP2b["③ Rule Chain\nRules in order → first match → Objective"]
+        PP1{"① Dedup<br/>Active task exists<br/>for this contract?"}
+        PP2a{"② Playbook Gate<br/>Contract eligible<br/>for this objective?"}
+        PP2b["③ Rule Chain<br/>Rules in order → first match → Objective"]
     end
 
     subgraph EXT_PATH["External Path (source = external)"]
-        EP1["① Validate fields\naction_type · customer_id\nsource_system · source_ref_id"]
-        EP2{"② Dedup\nSame source_system\n+ source_ref_id?"}
-        EP3{"③ action_type\n= Call / Visit?"}
+        EP1["① Validate fields<br/>action_type · customer_id<br/>source_system · source_ref_id"]
+        EP2{"② Dedup<br/>Same source_system<br/>+ source_ref_id?"}
+        EP3{"③ action_type<br/>= Call / Visit?"}
     end
 
     subgraph GATE["Contact Gates — Call / Visit only"]
-        G1{"Daily contact\nlimit reached?\n(BOS log check)"}
-        G2{"Contact window\nclosed?\n(DaVinci event)"}
+        G1{"Daily contact limit reached?<br/>(BOS log check)"}
+        G2{"Contact window closed?<br/>(DaVinci event)"}
     end
 
-    TASK(["✅ CREATED\n→ Task Lifecycle begins"])
+    TASK(["✅ CREATED — Task Lifecycle begins"])
     SUP(["🚫 Suppressed / Rejected"])
 
     EV --> PP1
@@ -123,9 +123,9 @@ flowchart TD
 
     MAN -->|"Gate exempt — all action types"| TASK
 
-    G1 -->|"Yes → suppress\nsurface in supervisor\nexception panel"| SUP
+    G1 -->|"Yes → suppress (supervisor panel)"| SUP
     G1 -->|"No"| G2
-    G2 -->|"Yes → not created\nCO sees contact\nwindow closed"| SUP
+    G2 -->|"Yes → contact window closed"| SUP
     G2 -->|"No"| TASK
 
     class EV,EXT,MAN sourceNode
