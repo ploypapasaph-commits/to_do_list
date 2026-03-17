@@ -74,6 +74,15 @@ How a task moves from trigger to `CREATED` state — covering all three source p
 
 ```mermaid
 flowchart TD
+    classDef sourceNode fill:#334155,stroke:#1e293b,color:#f1f5f9
+    classDef playbookDecision fill:#1d4ed8,stroke:#1e3a8a,color:#fff
+    classDef playbookProcess fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    classDef extDecision fill:#0f766e,stroke:#134e4a,color:#fff
+    classDef extProcess fill:#14b8a6,stroke:#0f766e,color:#fff
+    classDef gateNode fill:#b45309,stroke:#78350f,color:#fff
+    classDef successNode fill:#15803d,stroke:#14532d,color:#fff
+    classDef rejectNode fill:#b91c1c,stroke:#7f1d1d,color:#fff
+
     subgraph SOURCES["Task Sources"]
         EV(["📡 Contract Event\nDaVinci / Core Banking / Policy Admin"])
         EXT(["📨 TaskCreationRequest\nOnigiri · Matcha"])
@@ -118,6 +127,20 @@ flowchart TD
     G1 -->|"No"| G2
     G2 -->|"Yes → not created\nCO sees contact\nwindow closed"| SUP
     G2 -->|"No"| TASK
+
+    class EV,EXT,MAN sourceNode
+    class PP1,PP2a playbookDecision
+    class PP2b playbookProcess
+    class EP2,EP3 extDecision
+    class EP1 extProcess
+    class G1,G2 gateNode
+    class TASK successNode
+    class SUP rejectNode
+
+    style SOURCES fill:#f8fafc,stroke:#cbd5e1,color:#1e293b
+    style PLAYBOOK_PATH fill:#eff6ff,stroke:#bfdbfe,color:#1e293b
+    style EXT_PATH fill:#f0fdfa,stroke:#99f6e4,color:#1e293b
+    style GATE fill:#fffbeb,stroke:#fde68a,color:#1e293b
 ```
 
 ---
