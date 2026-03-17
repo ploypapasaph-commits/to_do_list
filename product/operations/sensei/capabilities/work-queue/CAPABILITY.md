@@ -70,7 +70,7 @@ When a CO opens a priority bucket, they see a table with the following columns:
 | Urgency | `the_collection_urgency` score for this contract |
 | Objective | Current playbook objective (เอาวันนัดชำระ / แจ้งเตือนฯ / เก็บยอดฯ / ติดตามเข้มงวด) |
 | Customer Name | Full name of the contract holder |
-| Deadline (date) | The relevant action deadline — PTP_date if set, otherwise due_date |
+| Deadline (date) | The relevant action deadline — PTP_date if set, otherwise due_date. Text color indicates task status: 🔴 Red = task date was > 1 day ago AND CO has not yet followed up; 🔵 Blue = task date was > 1 day ago AND task is still incomplete; ⚫ Black = task date is today |
 | Due Date | Contract due date (`due_date`) from Core Banking |
 | Last Contact Date | Date of the most recent completed contact task |
 | Last Contact Result | Outcome of the most recent contact (e.g., PTP, No Answer, Refused) |
