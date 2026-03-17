@@ -82,12 +82,14 @@ flowchart TD
 
     subgraph PLAYBOOK_PATH["Playbook Path (source = playbook_step)"]
         PP1{"① Dedup\nActive task exists\nfor this contract?"}
-        PP2["② Gate + Rule Chain\nGate check → rules 1–5 in order → first match → Objective"]
+        PP2a{"② Playbook Gate\nContract eligible\nfor this objective?"}
+        PP2b["③ Rule Chain\nRules in order → first match → Objective"]
     end
 
     subgraph EXT_PATH["External Path (source = external)"]
         EP1["① Validate fields\naction_type · customer_id\nsource_system · source_ref_id"]
         EP2{"② Dedup\nSame source_system\n+ source_ref_id?"}
+        EP3{"③ action_type\n= Call / Visit?"}
     end
 
     subgraph GATE["Contact Gates — Call / Visit only"]
@@ -100,13 +102,17 @@ flowchart TD
 
     EV --> PP1
     PP1 -->|"Yes — suppress"| SUP
-    PP1 -->|"No"| PP2 --> G1
+    PP1 -->|"No"| PP2a
+    PP2a -->|"No match — suppress"| SUP
+    PP2a -->|"Match"| PP2b --> G1
 
     EXT --> EP1 --> EP2
     EP2 -->|"Yes — suppress"| SUP
-    EP2 -->|"No"| G1
+    EP2 -->|"No"| EP3
+    EP3 -->|"Yes"| G1
+    EP3 -->|"No (Admin)"| TASK
 
-    MAN -->|"Admin/manual\ngate exempt"| TASK
+    MAN -->|"Gate exempt — all action types"| TASK
 
     G1 -->|"Yes → suppress\nsurface in supervisor\nexception panel"| SUP
     G1 -->|"No"| G2
