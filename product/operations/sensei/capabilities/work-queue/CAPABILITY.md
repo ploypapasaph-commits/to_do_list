@@ -76,7 +76,7 @@ When a CO opens a priority bucket, they see a table with the following columns:
 | Last Contact Result | Outcome of the most recent contact (e.g., PTP, No Answer, Refused) |
 | Payment Status | Current payment status of the contract |
 | Forecasted Amount | ยอดตามคาดการณ์ — the expected payment amount for this collection cycle |
-| Other Person in Charge | Other COs currently assigned to tasks on this contract |
+| Other Person in Charge | Other COs currently assigned to tasks on this contract. If the task was assigned by AM (มอบหมายงาน), this field displays "พื้นที่ส่งมา" instead of a CO name |
 
 **Default sort order within each bucket**: Overdue → highest `the_collection_urgency` score → earliest Deadline.
 
